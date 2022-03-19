@@ -18,6 +18,7 @@ import { AppState } from '../store'
 import clsx from 'clsx'
 import { toolbarActions } from '../store/toolbar-state'
 
+type WheelOp = 'drag' | 'zoom'
 type Props = {
   width?: number
   height?: number
@@ -59,6 +60,7 @@ const ImageCanvas: React.FC<Props> = ({
   const [color, setColor] = React.useState('#FFFFFF')
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
   const [img, setImg] = React.useState<HTMLImageElement | CanvasImageSource>()
+  const [wheelOp, setWheelOp] = React.useState<WheelOp>('zoom')
 
   const handleClick = (event: KonvaEventObject<MouseEvent>) => {
     const stage = event.target.getStage()
@@ -85,6 +87,17 @@ const ImageCanvas: React.FC<Props> = ({
       dispatch(toolbarActions.setBusy(false))
     }
   }
+  const handleDoubleClick = (event: KonvaEventObject<MouseEvent>) => {
+    if (started) {
+      console.log('Adding annotation')
+      // escape last points
+      let newPoints = points.slice(0, -2)
+      setPoints(newPoints)
+      setStarted(false)
+      // if we have points, store it as a new annotations
+      setAnnotations([...annotations, { id: uuid(), color, points: newPoints }])
+    }
+  }
   const handleMouseMove = (event: KonvaEventObject<MouseEvent>) => {
     const stage = event.target.getStage()
     if (!stage) return
@@ -106,46 +119,63 @@ const ImageCanvas: React.FC<Props> = ({
       setPoints([...prevPoints, x, y])
     }
   }
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (started && event.key === 'Escape') {
-      // escape last points
-      let newPoints = points.slice(0, -2)
-      setPoints(newPoints)
-      setStarted(false)
-      // if we have points, store it as a new annotations
-      setAnnotations([...annotations, { id: uuid(), color, points: newPoints }])
+  const handleKeyDown = (event: KeyboardEvent) => {
+    // console.log(event.key)
+    // event.preventDefault()
+    switch (event.key) {
+      case 'Escape':
+        break
+      case 'Control':
+        setWheelOp('drag')
+        break
+    }
+  }
+  const handleKeyUp = (event: KeyboardEvent) => {
+    switch (event.key) {
+      case 'Control':
+        setWheelOp('zoom')
+        break
     }
   }
 
-  const zoomStage = (event: KonvaEventObject<WheelEvent>) => {
+  const handleWheel = (event: KonvaEventObject<WheelEvent>) => {
     event.evt.preventDefault()
     if (stageRef.current !== null) {
       const stage = stageRef.current
       const oldScale = stage.scale()
+      const oldPos = stage.position()
       const pointer = stage.getPointerPosition()
       if (!pointer) return
-      const mousePointTo = {
-        x: (pointer.x - stage.x()) / oldScale.x,
-        y: (pointer.y - stage.y()) / oldScale.y,
+      if (wheelOp === 'zoom') {
+        const mousePointTo = {
+          x: (pointer.x - stage.x()) / oldScale.x,
+          y: (pointer.y - stage.y()) / oldScale.y,
+        }
+        let newScale =
+          event.evt.deltaY > 0
+            ? { x: oldScale.x / scaleBy, y: oldScale.y / scaleBy }
+            : { x: oldScale.x * scaleBy, y: oldScale.y * scaleBy }
+        if (
+          newScale.x < width / (img!!.width as number) ||
+          newScale.y < height / (img!!.height as number)
+        ) {
+          newScale.x = width / (img!!.width as number)
+          newScale.y = height / (img!!.height as number)
+        }
+        setStageScale(newScale)
+        const newPos = {
+          x: pointer.x - mousePointTo.x * newScale.x,
+          y: pointer.y - mousePointTo.y * newScale.y,
+        }
+        stage.position(newPos)
+        stage.batchDraw()
+      } else if (wheelOp === 'drag') {
+        const newPos = {
+          x: oldPos.x,
+          y: oldPos.y + event.evt.deltaY * 0.3,
+        }
+        stage.position(newPos)
       }
-      let newScale =
-        event.evt.deltaY > 0
-          ? { x: oldScale.x / scaleBy, y: oldScale.y / scaleBy }
-          : { x: oldScale.x * scaleBy, y: oldScale.y * scaleBy }
-      if (
-        newScale.x < width / (img!!.width as number) ||
-        newScale.y < height / (img!!.height as number)
-      ) {
-        newScale.x = width / (img!!.width as number)
-        newScale.y = height / (img!!.height as number)
-      }
-      setStageScale(newScale)
-      const newPos = {
-        x: pointer.x - mousePointTo.x * newScale.x,
-        y: pointer.y - mousePointTo.y * newScale.y,
-      }
-      stage.position(newPos)
-      stage.batchDraw()
     }
   }
 
@@ -235,6 +265,12 @@ const ImageCanvas: React.FC<Props> = ({
       const imageHeight = image.width as number
       setStageScale({ x: width / imageWidth, y: height / imageHeight })
     }
+    window.addEventListener('keydown', (ev) => handleKeyDown(ev))
+    window.addEventListener('keyup', (ev) => handleKeyUp(ev))
+    return () => {
+      window.removeEventListener('keydown', (ev) => handleKeyDown(ev))
+      window.removeEventListener('keyup', (ev) => handleKeyUp(ev))
+    }
   }, [])
 
   React.useEffect(() => {
@@ -242,7 +278,14 @@ const ImageCanvas: React.FC<Props> = ({
   }, [stageScale])
 
   return (
-    <div tabIndex={1} onKeyDown={handleKeyDown}>
+    <div
+      tabIndex={1}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          setStarted(false)
+        }
+      }}
+    >
       <Stage
         className={clsx({
           'cursor-pointer': currentTool === 'pointer',
@@ -259,7 +302,7 @@ const ImageCanvas: React.FC<Props> = ({
         width={width}
         height={height}
         draggable={!isTouchEnabled() && currentTool === 'pointer'}
-        onWheel={zoomStage}
+        onWheel={handleWheel}
         onTouchMove={handlePanningStart}
         onTouchEnd={handlePanningEnd}
         // onMouseDown={handleClick}
@@ -267,6 +310,7 @@ const ImageCanvas: React.FC<Props> = ({
         ref={stageRef}
         scale={stageScale}
         onClick={handleClick}
+        onDblClick={handleDoubleClick}
       >
         <Layer id="image-layer">
           <KonvaImage ref={imageRef} image={img} />
@@ -287,9 +331,16 @@ const ImageCanvas: React.FC<Props> = ({
               points={a.points}
               color={a.color}
               dotSize={4 / stageScale.x}
+              strokeWidth={1 / stageScale.x}
             />
           ))}
-          {started && <PolygonShape points={points} color={'#FFFFFF'} />}
+          {started && (
+            <PolygonShape
+              strokeWidth={1 / stageScale.x}
+              points={points}
+              color={'#FFFFFF'}
+            />
+          )}
         </Layer>
       </Stage>
     </div>
