@@ -88,8 +88,7 @@ const ImageCanvas: React.FC<Props> = ({
       y: (pointer.y - stage.y()) / stage.scaleY(),
     }
     setCursorPos([mousePointTo.x, mousePointTo.y])
-    // cursorRef.current!!.style.top = `${pointer.y - 20}px`
-    // cursorRef.current!!.style.left = `${pointer.x - 20}px`
+
     if (started && points.length > 0) {
       const { x, y } = mousePointTo
       let prevPoints = points.slice(0, -2)
@@ -234,7 +233,6 @@ const ImageCanvas: React.FC<Props> = ({
     stageRef && stageRef.current && stageRef.current.scale(stageScale)
   }, [stageScale])
 
-  const cursorRef = React.useRef<HTMLDivElement>(null)
   return (
     <div tabIndex={1} onKeyDown={handleKeyDown}>
       <Stage
@@ -281,14 +279,6 @@ const ImageCanvas: React.FC<Props> = ({
           {started && <PolygonShape points={points} color={'#FFFFFF'} />}
         </Layer>
       </Stage>
-      <div className="fixed top-0 left-0 w-[400px] rounded bg-white">
-        scale: ({stageScale.x.toFixed(2)},{stageScale.y.toFixed(2)}), x:{' '}
-        {cursorPos[0]}, y: {cursorPos[1]}
-      </div>
-      <div
-        ref={cursorRef}
-        className="fixed h-[40px] w-[40px] rounded-full bg-yellow-600"
-      ></div>
     </div>
   )
 }
