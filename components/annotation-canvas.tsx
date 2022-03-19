@@ -258,7 +258,7 @@ const ImageCanvas: React.FC<Props> = ({
         }}
         width={width}
         height={height}
-        draggable={!isTouchEnabled()}
+        draggable={!isTouchEnabled() && currentTool === 'pointer'}
         onWheel={zoomStage}
         onTouchMove={handlePanningStart}
         onTouchEnd={handlePanningEnd}
