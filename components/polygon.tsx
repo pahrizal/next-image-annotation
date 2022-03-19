@@ -25,15 +25,16 @@ export default React.memo(function Polygon({
   onResize,
 }: PolygonShapeProps) {
   const lineRef = React.useRef<Konva.Line>(null)
-  const onMouseEnter = (event: KonvaEventObject<MouseEvent>) => {
-    if (!selected) return
-    event.target.getStage()!!.container().style.cursor = 'move'
-  }
+  //   const onMouseEnter = (event: KonvaEventObject<MouseEvent>) => {
+  //     if (!selected) return
+  //     event.target.getStage()!!.container().style.cursor = 'move'
+  //   }
 
-  const onMouseLeave = (event: KonvaEventObject<MouseEvent>) => {
-    if (!selected) return
-    event.target.getStage()!!.container().style.cursor = 'crosshair'
-  }
+  //   const onMouseLeave = (event: KonvaEventObject<MouseEvent>) => {
+  //     if (!selected) return
+  //     event.target.getStage()!!.container().style.cursor = 'crosshair'
+  //   }
+
   const pointChunks: number[][] = points.reduce(
     (t: number[][], c, i) => (i % 2 ? t : [...t, points.slice(i, i + 2)]),
     []
@@ -49,8 +50,8 @@ export default React.memo(function Polygon({
         strokeWidth={1}
         closed
         onMouseDown={onSelect}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
+        // onMouseEnter={onMouseEnter}
+        // onMouseLeave={onMouseLeave}
         tension={tension}
       />
       {selected &&

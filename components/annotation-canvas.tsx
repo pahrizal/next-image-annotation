@@ -13,6 +13,10 @@ import randomColor from 'randomcolor'
 import uuid from 'uuid/v1'
 import Konva from 'konva'
 import { Layer, Stage, Image as KonvaImage } from 'react-konva'
+import { useDispatch, useSelector } from 'react-redux'
+import { AppState } from '../store'
+import clsx from 'clsx'
+import { toolbarActions } from '../store/toolbar-state'
 
 type Props = {
   width?: number
@@ -33,6 +37,8 @@ const ImageCanvas: React.FC<Props> = ({
   scaleBy = 1.05,
   image,
 }) => {
+  const dispatch = useDispatch()
+  const currentTool = useSelector((state: AppState) => state.toolbar.current)
   const stageRef = React.useRef<StageType>(null)
   const imageRef = React.useRef<Konva.Image>(null)
   const [lastCenter, setLastCenter] = React.useState<Vector2d | null>(null)
@@ -57,13 +63,14 @@ const ImageCanvas: React.FC<Props> = ({
   const handleClick = (event: KonvaEventObject<MouseEvent>) => {
     const stage = event.target.getStage()
     if (!stage) return
-    if (!started && !selectedId) {
+    if (!started && !selectedId && currentTool === 'polygon') {
       // this is the first click
       const scale = stage.scaleX()
       const pointer = stage.getPointerPosition()
       if (!pointer) return
       setPoints(cursorPos)
       setStarted(true)
+      dispatch(toolbarActions.setBusy(true))
       setColor(randomColor())
     } else {
       let prevPoints = points.slice(0, -2)
@@ -75,6 +82,7 @@ const ImageCanvas: React.FC<Props> = ({
     // if clicked outside annotation shape, close the shape
     if (selectedId && imageRef.current && event.target === imageRef.current) {
       setSelectedId(null)
+      dispatch(toolbarActions.setBusy(false))
     }
   }
   const handleMouseMove = (event: KonvaEventObject<MouseEvent>) => {
@@ -122,8 +130,8 @@ const ImageCanvas: React.FC<Props> = ({
       }
       let newScale =
         event.evt.deltaY > 0
-          ? { x: oldScale.x * scaleBy, y: oldScale.y * scaleBy }
-          : { x: oldScale.x / scaleBy, y: oldScale.y / scaleBy }
+          ? { x: oldScale.x / scaleBy, y: oldScale.y / scaleBy }
+          : { x: oldScale.x * scaleBy, y: oldScale.y * scaleBy }
       if (
         newScale.x < width / (img!!.width as number) ||
         newScale.y < height / (img!!.height as number)
@@ -236,6 +244,11 @@ const ImageCanvas: React.FC<Props> = ({
   return (
     <div tabIndex={1} onKeyDown={handleKeyDown}>
       <Stage
+        className={clsx({
+          'cursor-pointer': currentTool === 'pointer',
+          'cursor-crosshair':
+            currentTool === 'rectangle' || currentTool === 'polygon',
+        })}
         style={{
           backgroundColor: '#000',
           position: 'absolute',
