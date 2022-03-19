@@ -6,6 +6,7 @@ type Props = {
   pointIdx: number
   points: number[]
   size?: number
+  strokeWidth?: number
   onDragMove: (idx: number, pos: number[]) => void
   onDragEnd: (idx: number, pos: number[]) => void
 }
@@ -15,6 +16,7 @@ export default function ResizeHelperCircle({
   size = 4,
   onDragMove,
   onDragEnd,
+  strokeWidth = 1,
 }: Props) {
   const ref = useRef<Konva.Circle>(null)
   return (
@@ -25,7 +27,7 @@ export default function ResizeHelperCircle({
       y={points[1]}
       fill="transparent"
       stroke="white"
-      strokeWidth={1}
+      strokeWidth={strokeWidth}
       radius={size}
       onMouseEnter={(e) => {
         e.target.getStage()!!.container().style.cursor = 'pointer'
