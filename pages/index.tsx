@@ -11,7 +11,7 @@ const AnnotationCanvas = dynamic(
   }
 )
 
-const imageURL = 'https://picsum.photos/1280/720'
+const imageURL = 'https://picsum.photos/1920/1080'
 
 const Home: NextPage = () => {
   const dispatch = useDispatch()

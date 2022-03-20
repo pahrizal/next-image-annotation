@@ -28,10 +28,7 @@ const Toolbar = () => {
   return (
     <div
       className={clsx(
-        'fixed top-0 left-0 flex w-[52px] flex-col items-center space-y-4  bg-white p-3',
-        {
-          'h-screen': true,
-        }
+        'left-center absolute top-0 flex h-[48px] w-[200px] flex-row items-center justify-center space-x-4 bg-white  p-3 shadow-md'
       )}
     >
       {toolbars &&
