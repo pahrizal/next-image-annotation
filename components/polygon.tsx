@@ -10,6 +10,7 @@ type PolygonShapeProps = {
   points: number[]
   color?: string
   dotSize?: number
+  strokeWidth?: number
   tension?: number
   onResize?: (points: number[]) => void
 }
@@ -21,19 +22,21 @@ export default React.memo(function Polygon({
   points,
   color = '#FFFFFF',
   dotSize = 8,
+  strokeWidth = 1,
   tension = 0.01,
   onResize,
 }: PolygonShapeProps) {
   const lineRef = React.useRef<Konva.Line>(null)
-  const onMouseEnter = (event: KonvaEventObject<MouseEvent>) => {
-    if (!selected) return
-    event.target.getStage()!!.container().style.cursor = 'move'
-  }
+  //   const onMouseEnter = (event: KonvaEventObject<MouseEvent>) => {
+  //     if (!selected) return
+  //     event.target.getStage()!!.container().style.cursor = 'move'
+  //   }
 
-  const onMouseLeave = (event: KonvaEventObject<MouseEvent>) => {
-    if (!selected) return
-    event.target.getStage()!!.container().style.cursor = 'crosshair'
-  }
+  //   const onMouseLeave = (event: KonvaEventObject<MouseEvent>) => {
+  //     if (!selected) return
+  //     event.target.getStage()!!.container().style.cursor = 'crosshair'
+  //   }
+
   const pointChunks: number[][] = points.reduce(
     (t: number[][], c, i) => (i % 2 ? t : [...t, points.slice(i, i + 2)]),
     []
@@ -46,11 +49,11 @@ export default React.memo(function Polygon({
         fill={`${color}22`}
         points={points}
         stroke={color}
-        strokeWidth={1}
+        strokeWidth={strokeWidth}
         closed
         onMouseDown={onSelect}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
+        // onMouseEnter={onMouseEnter}
+        // onMouseLeave={onMouseLeave}
         tension={tension}
       />
       {selected &&
@@ -73,6 +76,7 @@ export default React.memo(function Polygon({
             pointIdx={j}
             points={pts}
             key={`dot-${j}`}
+            strokeWidth={strokeWidth}
           />
         ))}
     </>

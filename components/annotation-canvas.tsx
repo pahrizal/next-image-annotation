@@ -1,5 +1,6 @@
 import * as React from 'react'
 import {
+  calculateAspectRatioFit,
   getCenter,
   getDistance,
   isTouchEnabled,
@@ -13,7 +14,12 @@ import randomColor from 'randomcolor'
 import uuid from 'uuid/v1'
 import Konva from 'konva'
 import { Layer, Stage, Image as KonvaImage } from 'react-konva'
-
+import { useDispatch, useSelector } from 'react-redux'
+import { AppState } from '../store'
+import clsx from 'clsx'
+import { toolbarActions } from '../store/toolbar-state'
+type Screen = { width: number; height: number }
+type WheelOp = 'drag' | 'zoom'
 type Props = {
   width?: number
   height?: number
@@ -26,6 +32,9 @@ interface BaseAnnotation {
   color: string
   points: number[]
 }
+
+const SCROLL_SMOOTHING_VACTOR = 0.3
+
 const ImageCanvas: React.FC<Props> = ({
   width = window.innerWidth,
   height = window.innerHeight,
@@ -33,6 +42,8 @@ const ImageCanvas: React.FC<Props> = ({
   scaleBy = 1.05,
   image,
 }) => {
+  const dispatch = useDispatch()
+  const currentTool = useSelector((state: AppState) => state.toolbar.current)
   const stageRef = React.useRef<StageType>(null)
   const imageRef = React.useRef<Konva.Image>(null)
   const [lastCenter, setLastCenter] = React.useState<Vector2d | null>(null)
@@ -43,27 +54,29 @@ const ImageCanvas: React.FC<Props> = ({
   })
   const [points, setPoints] = React.useState<number[]>([])
   const [cursorPos, setCursorPos] = React.useState<[number, number]>([0, 0])
-  const [isMouseOverStartPoint, setIsMouseOverStartPoint] =
-    React.useState(false)
-  const [isFinished, setIsFinished] = React.useState(false)
-  const [drawing, setDrawing] = React.useState(false)
   const [panning, setPanning] = React.useState(false)
   const [annotations, setAnnotations] = React.useState<BaseAnnotation[]>([])
   const [started, setStarted] = React.useState(false)
   const [color, setColor] = React.useState('#FFFFFF')
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
   const [img, setImg] = React.useState<HTMLImageElement | CanvasImageSource>()
+  const [wheelOp, setWheelOp] = React.useState<WheelOp>('zoom')
+  const [screen, setScreen] = React.useState<Screen>({
+    width,
+    height,
+  })
 
   const handleClick = (event: KonvaEventObject<MouseEvent>) => {
     const stage = event.target.getStage()
     if (!stage) return
-    if (!started && !selectedId) {
+    if (!started && !selectedId && currentTool === 'polygon') {
       // this is the first click
       const scale = stage.scaleX()
       const pointer = stage.getPointerPosition()
       if (!pointer) return
       setPoints(cursorPos)
       setStarted(true)
+      dispatch(toolbarActions.setBusy(true))
       setColor(randomColor())
     } else {
       let prevPoints = points.slice(0, -2)
@@ -75,8 +88,21 @@ const ImageCanvas: React.FC<Props> = ({
     // if clicked outside annotation shape, close the shape
     if (selectedId && imageRef.current && event.target === imageRef.current) {
       setSelectedId(null)
+      dispatch(toolbarActions.setBusy(false))
     }
   }
+  const handleDoubleClick = (event: KonvaEventObject<MouseEvent>) => {
+    if (started) {
+      console.log('Adding annotation')
+      // escape last points
+      let newPoints = points.slice(0, -2)
+      setPoints(newPoints)
+      setStarted(false)
+      // if we have points, store it as a new annotations
+      setAnnotations([...annotations, { id: uuid(), color, points: newPoints }])
+    }
+  }
+
   const handleMouseMove = (event: KonvaEventObject<MouseEvent>) => {
     const stage = event.target.getStage()
     if (!stage) return
@@ -98,49 +124,39 @@ const ImageCanvas: React.FC<Props> = ({
       setPoints([...prevPoints, x, y])
     }
   }
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (started && event.key === 'Escape') {
-      // escape last points
-      let newPoints = points.slice(0, -2)
-      setPoints(newPoints)
-      setStarted(false)
-      // if we have points, store it as a new annotations
-      setAnnotations([...annotations, { id: uuid(), color, points: newPoints }])
-    }
-  }
-
-  const zoomStage = (event: KonvaEventObject<WheelEvent>) => {
+  const handleWheel = (event: KonvaEventObject<WheelEvent>) => {
     event.evt.preventDefault()
     if (stageRef.current !== null) {
       const stage = stageRef.current
       const oldScale = stage.scale()
+      const oldPos = stage.position()
       const pointer = stage.getPointerPosition()
       if (!pointer) return
-      const mousePointTo = {
-        x: (pointer.x - stage.x()) / oldScale.x,
-        y: (pointer.y - stage.y()) / oldScale.y,
+      if (wheelOp === 'zoom') {
+        const mousePointTo = {
+          x: (pointer.x - stage.x()) / oldScale.x,
+          y: (pointer.y - stage.y()) / oldScale.y,
+        }
+        let newScale =
+          event.evt.deltaY > 0
+            ? { x: oldScale.x / scaleBy, y: oldScale.y / scaleBy }
+            : { x: oldScale.x * scaleBy, y: oldScale.y * scaleBy }
+        setStageScale(newScale)
+        const newPos = {
+          x: pointer.x - mousePointTo.x * newScale.x,
+          y: pointer.y - mousePointTo.y * newScale.y,
+        }
+        stage.position(newPos)
+        stage.batchDraw()
+      } else if (wheelOp === 'drag') {
+        const newPos = {
+          x: oldPos.x,
+          y: oldPos.y + event.evt.deltaY * SCROLL_SMOOTHING_VACTOR,
+        }
+        stage.position(newPos)
       }
-      let newScale =
-        event.evt.deltaY > 0
-          ? { x: oldScale.x * scaleBy, y: oldScale.y * scaleBy }
-          : { x: oldScale.x / scaleBy, y: oldScale.y / scaleBy }
-      if (
-        newScale.x < width / (img!!.width as number) ||
-        newScale.y < height / (img!!.height as number)
-      ) {
-        newScale.x = width / (img!!.width as number)
-        newScale.y = height / (img!!.height as number)
-      }
-      setStageScale(newScale)
-      const newPos = {
-        x: pointer.x - mousePointTo.x * newScale.x,
-        y: pointer.y - mousePointTo.y * newScale.y,
-      }
-      stage.position(newPos)
-      stage.batchDraw()
     }
   }
-
   const handlePanningStart = (e: KonvaEventObject<TouchEvent>) => {
     e.evt.preventDefault()
     setPanning(true)
@@ -203,7 +219,6 @@ const ImageCanvas: React.FC<Props> = ({
       }
     }
   }
-
   const handlePanningEnd = () => {
     const stage = stageRef.current
     if (stage) {
@@ -213,19 +228,55 @@ const ImageCanvas: React.FC<Props> = ({
     setLastDist(0)
     setPanning(false)
   }
+  const applyStageScale = (image: HTMLImageElement | CanvasImageSource) => {
+    setImg(image)
+    const imageWidth = image.width as number
+    const imageHeight = image.width as number
+    const bestRatio = calculateAspectRatioFit(
+      imageWidth,
+      imageHeight,
+      screen.width,
+      screen.height
+    )
+    setStageScale({ x: bestRatio, y: bestRatio })
+  }
 
   React.useEffect(() => {
     if (image === undefined) return
     if (typeof image === 'string') {
       preloadImage(image).then((newImg) => {
-        setImg(newImg)
-        setStageScale({ x: width / newImg.width, y: height / newImg.height })
+        applyStageScale(newImg)
       })
     } else {
-      setImg(image)
-      const imageWidth = image.width as number
-      const imageHeight = image.width as number
-      setStageScale({ x: width / imageWidth, y: height / imageHeight })
+      applyStageScale(image)
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      switch (event.key) {
+        case 'Escape':
+          break
+        case 'Control':
+          setWheelOp('drag')
+          break
+      }
+    }
+    const handleKeyUp = (event: KeyboardEvent) => {
+      switch (event.key) {
+        case 'Control':
+          setWheelOp('zoom')
+          break
+      }
+    }
+    window.addEventListener('resize', function () {
+      setScreen({ width: this.innerWidth, height: this.innerHeight })
+    })
+    window.addEventListener('keydown', (ev) => handleKeyDown(ev))
+    window.addEventListener('keyup', (ev) => handleKeyUp(ev))
+    return () => {
+      window.removeEventListener('keydown', (ev) => handleKeyDown(ev))
+      window.removeEventListener('keyup', (ev) => handleKeyUp(ev))
+      window.removeEventListener('resize', function () {
+        setScreen({ width: this.innerWidth, height: this.innerHeight })
+      })
     }
   }, [])
 
@@ -233,27 +284,66 @@ const ImageCanvas: React.FC<Props> = ({
     stageRef && stageRef.current && stageRef.current.scale(stageScale)
   }, [stageScale])
 
+  // recalculate image size to fit the screen on resize
+  React.useEffect(() => {
+    if (!img) return
+    const imageWidth = img.width as number
+    const imageHeight = img.height as number
+    const ratio = calculateAspectRatioFit(
+      imageWidth,
+      imageHeight,
+      screen.width,
+      screen.height
+    )
+    setStageScale({ x: ratio, y: ratio })
+  }, [screen, img])
+
+  React.useEffect(() => {
+    if (!img) return
+    if (!stageRef.current) return
+    const imgHeight = img.height as number
+    const stage = stageRef.current
+    const currentPos = stage.getPosition()
+
+    // set stage in center of current view port
+    stageRef.current.setPosition({
+      ...currentPos,
+      y: screen.height / 2 - (imgHeight * stageScale.y) / 2,
+    })
+  }, [img])
+
   return (
-    <div tabIndex={1} onKeyDown={handleKeyDown}>
+    <div
+      tabIndex={1}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          setStarted(false)
+        }
+      }}
+    >
       <Stage
+        className={clsx('bg-slate-400', {
+          'cursor-pointer': currentTool === 'pointer',
+          'cursor-crosshair':
+            currentTool === 'rectangle' || currentTool === 'polygon',
+        })}
         style={{
-          backgroundColor: '#000',
           position: 'absolute',
           left: 0,
           top: 0,
           ...stageStyle,
         }}
-        width={width}
-        height={height}
-        draggable={!isTouchEnabled()}
-        onWheel={zoomStage}
+        width={screen.width}
+        height={screen.height}
+        draggable
+        onWheel={handleWheel}
         onTouchMove={handlePanningStart}
         onTouchEnd={handlePanningEnd}
-        // onMouseDown={handleClick}
         onMouseMove={handleMouseMove}
         ref={stageRef}
         scale={stageScale}
         onClick={handleClick}
+        onDblClick={handleDoubleClick}
       >
         <Layer id="image-layer">
           <KonvaImage ref={imageRef} image={img} />
@@ -274,9 +364,16 @@ const ImageCanvas: React.FC<Props> = ({
               points={a.points}
               color={a.color}
               dotSize={4 / stageScale.x}
+              strokeWidth={1 / stageScale.x}
             />
           ))}
-          {started && <PolygonShape points={points} color={'#FFFFFF'} />}
+          {started && (
+            <PolygonShape
+              strokeWidth={1 / stageScale.x}
+              points={points}
+              color={'#FFFFFF'}
+            />
+          )}
         </Layer>
       </Stage>
     </div>
