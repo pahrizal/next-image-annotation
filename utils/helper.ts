@@ -28,3 +28,14 @@ export const preloadImage = async (
     }
     newImg.src = imgPath
   })
+
+export const calculateAspectRatioFit = (
+  srcWidth: number,
+  srcHeight: number,
+  maxWidth: number,
+  maxHeight: number
+) => {
+  var ratio = Math.min(maxWidth / srcWidth, maxHeight / srcHeight)
+
+  return ratio
+}

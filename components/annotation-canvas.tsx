@@ -1,5 +1,6 @@
 import * as React from 'react'
 import {
+  calculateAspectRatioFit,
   getCenter,
   getDistance,
   isTouchEnabled,
@@ -17,7 +18,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { AppState } from '../store'
 import clsx from 'clsx'
 import { toolbarActions } from '../store/toolbar-state'
-
+type Screen = { width: number; height: number }
 type WheelOp = 'drag' | 'zoom'
 type Props = {
   width?: number
@@ -31,6 +32,9 @@ interface BaseAnnotation {
   color: string
   points: number[]
 }
+
+const SCROLL_SMOOTHING_VACTOR = 0.3
+
 const ImageCanvas: React.FC<Props> = ({
   width = window.innerWidth,
   height = window.innerHeight,
@@ -50,10 +54,6 @@ const ImageCanvas: React.FC<Props> = ({
   })
   const [points, setPoints] = React.useState<number[]>([])
   const [cursorPos, setCursorPos] = React.useState<[number, number]>([0, 0])
-  const [isMouseOverStartPoint, setIsMouseOverStartPoint] =
-    React.useState(false)
-  const [isFinished, setIsFinished] = React.useState(false)
-  const [drawing, setDrawing] = React.useState(false)
   const [panning, setPanning] = React.useState(false)
   const [annotations, setAnnotations] = React.useState<BaseAnnotation[]>([])
   const [started, setStarted] = React.useState(false)
@@ -61,6 +61,10 @@ const ImageCanvas: React.FC<Props> = ({
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
   const [img, setImg] = React.useState<HTMLImageElement | CanvasImageSource>()
   const [wheelOp, setWheelOp] = React.useState<WheelOp>('zoom')
+  const [screen, setScreen] = React.useState<Screen>({
+    width,
+    height,
+  })
 
   const handleClick = (event: KonvaEventObject<MouseEvent>) => {
     const stage = event.target.getStage()
@@ -98,6 +102,7 @@ const ImageCanvas: React.FC<Props> = ({
       setAnnotations([...annotations, { id: uuid(), color, points: newPoints }])
     }
   }
+
   const handleMouseMove = (event: KonvaEventObject<MouseEvent>) => {
     const stage = event.target.getStage()
     if (!stage) return
@@ -119,25 +124,6 @@ const ImageCanvas: React.FC<Props> = ({
       setPoints([...prevPoints, x, y])
     }
   }
-  const handleKeyDown = (event: KeyboardEvent) => {
-    // console.log(event.key)
-    // event.preventDefault()
-    switch (event.key) {
-      case 'Escape':
-        break
-      case 'Control':
-        setWheelOp('drag')
-        break
-    }
-  }
-  const handleKeyUp = (event: KeyboardEvent) => {
-    switch (event.key) {
-      case 'Control':
-        setWheelOp('zoom')
-        break
-    }
-  }
-
   const handleWheel = (event: KonvaEventObject<WheelEvent>) => {
     event.evt.preventDefault()
     if (stageRef.current !== null) {
@@ -155,13 +141,6 @@ const ImageCanvas: React.FC<Props> = ({
           event.evt.deltaY > 0
             ? { x: oldScale.x / scaleBy, y: oldScale.y / scaleBy }
             : { x: oldScale.x * scaleBy, y: oldScale.y * scaleBy }
-        if (
-          newScale.x < width / (img!!.width as number) ||
-          newScale.y < height / (img!!.height as number)
-        ) {
-          newScale.x = width / (img!!.width as number)
-          newScale.y = height / (img!!.height as number)
-        }
         setStageScale(newScale)
         const newPos = {
           x: pointer.x - mousePointTo.x * newScale.x,
@@ -172,13 +151,12 @@ const ImageCanvas: React.FC<Props> = ({
       } else if (wheelOp === 'drag') {
         const newPos = {
           x: oldPos.x,
-          y: oldPos.y + event.evt.deltaY * 0.3,
+          y: oldPos.y + event.evt.deltaY * SCROLL_SMOOTHING_VACTOR,
         }
         stage.position(newPos)
       }
     }
   }
-
   const handlePanningStart = (e: KonvaEventObject<TouchEvent>) => {
     e.evt.preventDefault()
     setPanning(true)
@@ -241,7 +219,6 @@ const ImageCanvas: React.FC<Props> = ({
       }
     }
   }
-
   const handlePanningEnd = () => {
     const stage = stageRef.current
     if (stage) {
@@ -251,31 +228,89 @@ const ImageCanvas: React.FC<Props> = ({
     setLastDist(0)
     setPanning(false)
   }
+  const applyStageScale = (image: HTMLImageElement | CanvasImageSource) => {
+    setImg(image)
+    const imageWidth = image.width as number
+    const imageHeight = image.width as number
+    const bestRatio = calculateAspectRatioFit(
+      imageWidth,
+      imageHeight,
+      screen.width,
+      screen.height
+    )
+    setStageScale({ x: bestRatio, y: bestRatio })
+  }
 
   React.useEffect(() => {
     if (image === undefined) return
     if (typeof image === 'string') {
       preloadImage(image).then((newImg) => {
-        setImg(newImg)
-        setStageScale({ x: width / newImg.width, y: height / newImg.height })
+        applyStageScale(newImg)
       })
     } else {
-      setImg(image)
-      const imageWidth = image.width as number
-      const imageHeight = image.width as number
-      setStageScale({ x: width / imageWidth, y: height / imageHeight })
+      applyStageScale(image)
     }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      switch (event.key) {
+        case 'Escape':
+          break
+        case 'Control':
+          setWheelOp('drag')
+          break
+      }
+    }
+    const handleKeyUp = (event: KeyboardEvent) => {
+      switch (event.key) {
+        case 'Control':
+          setWheelOp('zoom')
+          break
+      }
+    }
+    window.addEventListener('resize', function () {
+      setScreen({ width: this.innerWidth, height: this.innerHeight })
+    })
     window.addEventListener('keydown', (ev) => handleKeyDown(ev))
     window.addEventListener('keyup', (ev) => handleKeyUp(ev))
     return () => {
       window.removeEventListener('keydown', (ev) => handleKeyDown(ev))
       window.removeEventListener('keyup', (ev) => handleKeyUp(ev))
+      window.removeEventListener('resize', function () {
+        setScreen({ width: this.innerWidth, height: this.innerHeight })
+      })
     }
   }, [])
 
   React.useEffect(() => {
     stageRef && stageRef.current && stageRef.current.scale(stageScale)
   }, [stageScale])
+
+  // recalculate image size to fit the screen on resize
+  React.useEffect(() => {
+    if (!img) return
+    const imageWidth = img.width as number
+    const imageHeight = img.height as number
+    const ratio = calculateAspectRatioFit(
+      imageWidth,
+      imageHeight,
+      screen.width,
+      screen.height
+    )
+    setStageScale({ x: ratio, y: ratio })
+  }, [screen, img])
+
+  React.useEffect(() => {
+    if (!img) return
+    if (!stageRef.current) return
+    const imgHeight = img.height as number
+    const stage = stageRef.current
+    const currentPos = stage.getPosition()
+
+    // set stage in center of current view port
+    stageRef.current.setPosition({
+      ...currentPos,
+      y: screen.height / 2 - (imgHeight * stageScale.y) / 2,
+    })
+  }, [img])
 
   return (
     <div
@@ -287,25 +322,23 @@ const ImageCanvas: React.FC<Props> = ({
       }}
     >
       <Stage
-        className={clsx({
+        className={clsx('bg-slate-400', {
           'cursor-pointer': currentTool === 'pointer',
           'cursor-crosshair':
             currentTool === 'rectangle' || currentTool === 'polygon',
         })}
         style={{
-          backgroundColor: '#000',
           position: 'absolute',
           left: 0,
           top: 0,
           ...stageStyle,
         }}
-        width={width}
-        height={height}
-        draggable={!isTouchEnabled() && currentTool === 'pointer'}
+        width={screen.width}
+        height={screen.height}
+        draggable
         onWheel={handleWheel}
         onTouchMove={handlePanningStart}
         onTouchEnd={handlePanningEnd}
-        // onMouseDown={handleClick}
         onMouseMove={handleMouseMove}
         ref={stageRef}
         scale={stageScale}
