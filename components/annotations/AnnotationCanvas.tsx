@@ -51,7 +51,7 @@ const AnnotationCanvas: React.FC<Props> = ({
   uploadUrl,
 }) => {
   const dispatch = useDispatch()
-  const currentTool = useSelector((state: AppState) => state.toolbar.current)
+  const currentToolbar = useSelector((state: AppState) => state.toolbar.current)
   const annotations = useSelector(
     (state: AppState) => state.annotation.annotations
   )
@@ -89,7 +89,7 @@ const AnnotationCanvas: React.FC<Props> = ({
   const handleClick = (event: KonvaEventObject<MouseEvent>) => {
     const stage = event.target.getStage()
     if (!stage) return
-    if (!started && !selectedId && currentTool === 'polygon') {
+    if (!started && !selectedId && currentToolbar === 'polygon') {
       // this is the first click
       const scale = stage.scaleX()
       const pointer = stage.getPointerPosition()
@@ -318,13 +318,13 @@ const AnnotationCanvas: React.FC<Props> = ({
 
   return (
     <div className="fixed flex h-screen w-screen flex-col items-center justify-center bg-white">
-      {annotations.length > 0 && (
+      {annotations.length > 0 && currentToolbar !== 'upload' && (
         <GlobalHotKeys keyMap={annotationHotKeyMap} handlers={hotkeyHandlers}>
           <Stage
             className={clsx({
-              'cursor-pointer': currentTool === 'pointer',
+              'cursor-pointer': currentToolbar === 'pointer',
               'cursor-crosshair':
-                currentTool === 'rectangle' || currentTool === 'polygon',
+                currentToolbar === 'rectangle' || currentToolbar === 'polygon',
             })}
             style={{
               position: 'absolute',
@@ -399,7 +399,7 @@ const AnnotationCanvas: React.FC<Props> = ({
           <Toolbar />
         </GlobalHotKeys>
       )}
-      {annotations.length === 0 && (
+      {(annotations.length === 0 || currentToolbar === 'upload') && (
         <div>
           <ImageUploader
             targetUrl={uploadUrl}

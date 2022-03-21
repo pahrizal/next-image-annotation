@@ -2,6 +2,7 @@ import { Reducer } from 'redux'
 import uuid from 'uuid'
 import { preloadImage } from '../utils/helper'
 import { ThunkAction } from './index'
+import { ToolbarActions, toolbarActions } from './toolbarState'
 interface BaseAnnotation {
   id: string
   color: string
@@ -64,8 +65,12 @@ export const actions = {
   },
   setAnnotations: (
     payload: typeof initialState.annotations
-  ): ThunkAction<Actions> => {
+  ): ThunkAction<Actions | ToolbarActions> => {
     return async (dispatch, getState) => {
+      dispatch({
+        type: actionsTypes.SET_BUSY,
+        payload: true,
+      })
       const newAnnotations = payload
         .map((p) => {
           if (!p.id) p.id = uuid()
@@ -81,6 +86,11 @@ export const actions = {
         type: actionsTypes.SET_ANNOTATIONS,
         payload: newAnnotations,
       })
+      dispatch({
+        type: actionsTypes.SET_BUSY,
+        payload: false,
+      })
+      toolbarActions.setCurrent('pointer')(dispatch, getState)
     }
   },
   setCurrentIndex: (

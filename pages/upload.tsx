@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router'
-import React from 'react'
+import React, { useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import uuid from 'uuid'
 import ImageUploader from '../components/annotations/ImageUploader'
@@ -8,7 +8,6 @@ import { actions, ImageAnnotation } from '../store/annotationState'
 
 const UploadPage = () => {
   const dispatch = useDispatch()
-  const router = useRouter()
   const annotations = useSelector(
     (state: AppState) => state.annotation.annotations
   )
@@ -23,7 +22,6 @@ const UploadPage = () => {
             annotations: [],
           }))
           dispatch(actions.setAnnotations([...annotations, ...newAnnotations]))
-          router.push('/')
         }}
       />
     </div>

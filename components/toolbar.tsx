@@ -18,7 +18,6 @@ export const toolbars: ToolbarConfig = {
     enable: true,
     icon: <UploadIcon width={32} />,
     title: 'Upload',
-    href: '/upload',
   },
   pointer: { enable: true, icon: <PointerIcon width={32} />, title: 'Select' },
   polygon: {
