@@ -5,8 +5,7 @@ import {
   getDistance,
   isTouchEnabled,
   preloadImage,
-} from '../utils/helper'
-import PolygonShape from './polygon'
+} from '../../utils/helper'
 import { Vector2d } from 'konva/lib/types'
 import { Stage as StageType } from 'konva/lib/Stage'
 import { KonvaEventObject } from 'konva/lib/Node'
@@ -15,35 +14,50 @@ import uuid from 'uuid/v1'
 import Konva from 'konva'
 import { Layer, Stage, Image as KonvaImage } from 'react-konva'
 import { useDispatch, useSelector } from 'react-redux'
-import { AppState } from '../store'
+import { AppState } from '../../store'
 import clsx from 'clsx'
-import { toolbarActions } from '../store/toolbar-state'
+import { toolbarActions } from '../../store/toolbarState'
+import { annotationHotKeyMap } from './hotkey'
+import Toolbar from '../toolbar'
+import { GlobalHotKeys, HotKeys } from 'react-hotkeys'
+import {
+  actions as AnnotationActions,
+  ImageAnnotation,
+} from '../../store/annotationState'
+import Thumbnail from './Thumbnail'
+import UploadIcon from '../../assets/icons/upload-icon'
+import ImageUploader from './ImageUploader'
+import Polygon from './PolygonShape'
 type Screen = { width: number; height: number }
 type WheelOp = 'drag' | 'zoom'
+type ImageList = CanvasImageSource | string
+
+const SCROLL_SMOOTHING_VACTOR = 0.3
 type Props = {
   width?: number
   height?: number
-  image?: CanvasImageSource | string
+  images?: string[]
   stageStyle?: React.CSSProperties
   scaleBy?: number
-}
-interface BaseAnnotation {
-  id: string
-  color: string
-  points: number[]
+  uploadUrl?: string
 }
 
-const SCROLL_SMOOTHING_VACTOR = 0.3
-
-const ImageCanvas: React.FC<Props> = ({
+const AnnotationCanvas: React.FC<Props> = ({
   width = window.innerWidth,
   height = window.innerHeight,
   stageStyle,
   scaleBy = 1.05,
-  image,
+  images: imagesProp = [],
+  uploadUrl,
 }) => {
   const dispatch = useDispatch()
   const currentTool = useSelector((state: AppState) => state.toolbar.current)
+  const annotations = useSelector(
+    (state: AppState) => state.annotation.annotations
+  )
+  const currentImageIndex = useSelector(
+    (state: AppState) => state.annotation.currentIndex
+  )
   const stageRef = React.useRef<StageType>(null)
   const imageRef = React.useRef<Konva.Image>(null)
   const [lastCenter, setLastCenter] = React.useState<Vector2d | null>(null)
@@ -55,16 +69,22 @@ const ImageCanvas: React.FC<Props> = ({
   const [points, setPoints] = React.useState<number[]>([])
   const [cursorPos, setCursorPos] = React.useState<[number, number]>([0, 0])
   const [panning, setPanning] = React.useState(false)
-  const [annotations, setAnnotations] = React.useState<BaseAnnotation[]>([])
   const [started, setStarted] = React.useState(false)
   const [color, setColor] = React.useState('#FFFFFF')
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
   const [img, setImg] = React.useState<HTMLImageElement | CanvasImageSource>()
+  //   const [currentImageIndex, setCurrentImageIndex] = React.useState(0)
   const [wheelOp, setWheelOp] = React.useState<WheelOp>('zoom')
   const [screen, setScreen] = React.useState<Screen>({
     width,
     height,
   })
+  const hotkeyHandlers = {
+    PAN: () => setWheelOp('drag'),
+    ZOOM: () => setWheelOp('zoom'),
+    NEXT_IMAGE: () => dispatch(AnnotationActions.nextImage()),
+    PREV_IMAGE: () => dispatch(AnnotationActions.previousImage()),
+  }
 
   const handleClick = (event: KonvaEventObject<MouseEvent>) => {
     const stage = event.target.getStage()
@@ -93,13 +113,23 @@ const ImageCanvas: React.FC<Props> = ({
   }
   const handleDoubleClick = (event: KonvaEventObject<MouseEvent>) => {
     if (started) {
-      console.log('Adding annotation')
       // escape last points
       let newPoints = points.slice(0, -2)
       setPoints(newPoints)
       setStarted(false)
       // if we have points, store it as a new annotations
-      setAnnotations([...annotations, { id: uuid(), color, points: newPoints }])
+      const currentAnnotation = annotations[currentImageIndex]
+      currentAnnotation.annotations.push({
+        id: uuid(),
+        points: newPoints,
+        type: 'polygon',
+        color,
+      })
+      const newAnnotations = [
+        ...annotations.filter((a) => a.id !== currentAnnotation.id),
+        currentAnnotation,
+      ].sort((a, b) => a.id.localeCompare(b.id))
+      dispatch(AnnotationActions.setAnnotations(newAnnotations))
     }
   }
 
@@ -229,7 +259,6 @@ const ImageCanvas: React.FC<Props> = ({
     setPanning(false)
   }
   const applyStageScale = (image: HTMLImageElement | CanvasImageSource) => {
-    setImg(image)
     const imageWidth = image.width as number
     const imageHeight = image.width as number
     const bestRatio = calculateAspectRatioFit(
@@ -239,41 +268,31 @@ const ImageCanvas: React.FC<Props> = ({
       screen.height
     )
     setStageScale({ x: bestRatio, y: bestRatio })
+    setImg(image)
   }
+  React.useEffect(() => {
+    if (annotations.length > 0 && currentImageIndex >= 0) {
+      const currentAnnotation = annotations[currentImageIndex]
+
+      preloadImage(currentAnnotation.imageData).then((newImg) => {
+        setImg(newImg)
+      })
+    }
+  }, [currentImageIndex, annotations])
 
   React.useEffect(() => {
-    if (image === undefined) return
-    if (typeof image === 'string') {
-      preloadImage(image).then((newImg) => {
-        applyStageScale(newImg)
-      })
-    } else {
-      applyStageScale(image)
-    }
-    const handleKeyDown = (event: KeyboardEvent) => {
-      switch (event.key) {
-        case 'Escape':
-          break
-        case 'Control':
-          setWheelOp('drag')
-          break
-      }
-    }
-    const handleKeyUp = (event: KeyboardEvent) => {
-      switch (event.key) {
-        case 'Control':
-          setWheelOp('zoom')
-          break
-      }
+    if (imagesProp.length > 0) {
+      const newAnnotations: ImageAnnotation[] = imagesProp.map((img) => ({
+        id: uuid(),
+        imageData: img,
+        annotations: [],
+      }))
+      dispatch(AnnotationActions.setAnnotations(newAnnotations))
     }
     window.addEventListener('resize', function () {
       setScreen({ width: this.innerWidth, height: this.innerHeight })
     })
-    window.addEventListener('keydown', (ev) => handleKeyDown(ev))
-    window.addEventListener('keyup', (ev) => handleKeyUp(ev))
     return () => {
-      window.removeEventListener('keydown', (ev) => handleKeyDown(ev))
-      window.removeEventListener('keyup', (ev) => handleKeyUp(ev))
       window.removeEventListener('resize', function () {
         setScreen({ width: this.innerWidth, height: this.innerHeight })
       })
@@ -287,97 +306,121 @@ const ImageCanvas: React.FC<Props> = ({
   // recalculate image size to fit the screen on resize
   React.useEffect(() => {
     if (!img) return
+    if (!stageRef.current) return
     const imageWidth = img.width as number
     const imageHeight = img.height as number
-    const ratio = calculateAspectRatioFit(
-      imageWidth,
-      imageHeight,
-      screen.width,
-      screen.height
-    )
+    const stage = stageRef.current
+    const currentPos = stage.getPosition()
+    //TODO: set stage in center of current view port. Need to fix this (for now we force the zoom to fit the viewport)
+    const ratio = screen.height / imageHeight
     setStageScale({ x: ratio, y: ratio })
   }, [screen, img])
 
-  React.useEffect(() => {
-    if (!img) return
-    if (!stageRef.current) return
-    const imgHeight = img.height as number
-    const stage = stageRef.current
-    const currentPos = stage.getPosition()
-
-    // set stage in center of current view port
-    stageRef.current.setPosition({
-      ...currentPos,
-      y: screen.height / 2 - (imgHeight * stageScale.y) / 2,
-    })
-  }, [img])
-
   return (
-    <div
-      tabIndex={1}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') {
-          setStarted(false)
-        }
-      }}
-    >
-      <Stage
-        className={clsx('bg-slate-400', {
-          'cursor-pointer': currentTool === 'pointer',
-          'cursor-crosshair':
-            currentTool === 'rectangle' || currentTool === 'polygon',
-        })}
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          ...stageStyle,
-        }}
-        width={screen.width}
-        height={screen.height}
-        draggable
-        onWheel={handleWheel}
-        onTouchMove={handlePanningStart}
-        onTouchEnd={handlePanningEnd}
-        onMouseMove={handleMouseMove}
-        ref={stageRef}
-        scale={stageScale}
-        onClick={handleClick}
-        onDblClick={handleDoubleClick}
-      >
-        <Layer id="image-layer">
-          <KonvaImage ref={imageRef} image={img} />
-        </Layer>
-        <Layer>
-          {annotations.map((a, i) => (
-            <PolygonShape
-              onSelect={() => setSelectedId(a.id)}
-              selected={a.id === selectedId}
-              onResize={(newPoints) => {
-                const newAnnotations = [
-                  ...annotations.filter((ann) => ann.id !== a.id),
-                  { ...a, points: newPoints },
-                ]
-                setAnnotations(newAnnotations)
-              }}
-              key={i}
-              points={a.points}
-              color={a.color}
-              dotSize={4 / stageScale.x}
-              strokeWidth={1 / stageScale.x}
-            />
-          ))}
-          {started && (
-            <PolygonShape
-              strokeWidth={1 / stageScale.x}
-              points={points}
-              color={'#FFFFFF'}
-            />
-          )}
-        </Layer>
-      </Stage>
+    <div className="fixed flex h-screen w-screen flex-col items-center justify-center bg-white">
+      {annotations.length > 0 && (
+        <GlobalHotKeys keyMap={annotationHotKeyMap} handlers={hotkeyHandlers}>
+          <Stage
+            className={clsx({
+              'cursor-pointer': currentTool === 'pointer',
+              'cursor-crosshair':
+                currentTool === 'rectangle' || currentTool === 'polygon',
+            })}
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              ...stageStyle,
+            }}
+            width={screen.width}
+            height={screen.height}
+            draggable
+            onWheel={handleWheel}
+            onTouchMove={handlePanningStart}
+            onTouchEnd={handlePanningEnd}
+            onMouseMove={handleMouseMove}
+            ref={stageRef}
+            scale={stageScale}
+            onClick={handleClick}
+            onDblClick={handleDoubleClick}
+          >
+            <Layer id="image-layer">
+              <KonvaImage ref={imageRef} image={img} />
+            </Layer>
+            <Layer>
+              {annotations[currentImageIndex].annotations
+                .filter((a) => a.type === 'polygon')
+                .map((a, i) => (
+                  <Polygon
+                    onSelect={() => setSelectedId(a.id)}
+                    selected={a.id === selectedId}
+                    onResize={(newPoints) => {
+                      const currentAnnotation = annotations[currentImageIndex]
+                      const newPolygon = currentAnnotation.annotations.find(
+                        (x) => x.id === a.id
+                      )
+                      if (newPolygon) {
+                        newPolygon.points = newPoints
+                        dispatch(
+                          AnnotationActions.setAnnotations([
+                            ...annotations.filter(
+                              (xx) => xx.id !== currentAnnotation.id
+                            ),
+                            {
+                              ...currentAnnotation,
+                              annotations: [
+                                ...currentAnnotation.annotations.filter(
+                                  (aaa) => aaa.id !== a.id
+                                ),
+                                newPolygon,
+                              ],
+                            },
+                          ])
+                        )
+                      }
+                    }}
+                    key={i}
+                    points={a.points}
+                    color={a.color}
+                    dotSize={4 / stageScale.x}
+                    strokeWidth={1 / stageScale.x}
+                  />
+                ))}
+              {started && (
+                <Polygon
+                  strokeWidth={1 / stageScale.x}
+                  points={points}
+                  color={'#FFFFFF'}
+                />
+              )}
+            </Layer>
+          </Stage>
+          <Thumbnail />
+          <Toolbar />
+        </GlobalHotKeys>
+      )}
+      {annotations.length === 0 && (
+        <div>
+          <ImageUploader
+            targetUrl={uploadUrl}
+            onComplete={(files) => {
+              const newAnnotations: ImageAnnotation[] = files.map((f) => ({
+                id: uuid(),
+                imageData: f,
+                annotations: [],
+              }))
+              dispatch(
+                AnnotationActions.setAnnotations([
+                  ...annotations,
+                  ...newAnnotations,
+                ])
+              )
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }
 
-export default ImageCanvas
+export default React.memo(AnnotationCanvas)

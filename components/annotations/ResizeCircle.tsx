@@ -10,7 +10,7 @@ type Props = {
   onDragMove: (idx: number, pos: number[]) => void
   onDragEnd: (idx: number, pos: number[]) => void
 }
-export default function ResizeHelperCircle({
+export default function ResizeCircle({
   pointIdx,
   points,
   size = 4,

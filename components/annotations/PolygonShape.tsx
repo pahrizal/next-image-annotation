@@ -2,7 +2,7 @@ import Konva from 'konva'
 import { KonvaEventObject } from 'konva/lib/Node'
 import * as React from 'react'
 import { Line } from 'react-konva'
-import ResizerHelperCircle from './resize-helper-circle'
+import ResizerHelperCircle from './ResizeCircle'
 type PolygonShapeProps = {
   id?: string
   selected?: boolean
@@ -15,7 +15,7 @@ type PolygonShapeProps = {
   onResize?: (points: number[]) => void
 }
 
-export default React.memo(function Polygon({
+export default React.memo(function PolygonShape({
   id,
   selected = false,
   onSelect,
@@ -27,15 +27,6 @@ export default React.memo(function Polygon({
   onResize,
 }: PolygonShapeProps) {
   const lineRef = React.useRef<Konva.Line>(null)
-  //   const onMouseEnter = (event: KonvaEventObject<MouseEvent>) => {
-  //     if (!selected) return
-  //     event.target.getStage()!!.container().style.cursor = 'move'
-  //   }
-
-  //   const onMouseLeave = (event: KonvaEventObject<MouseEvent>) => {
-  //     if (!selected) return
-  //     event.target.getStage()!!.container().style.cursor = 'crosshair'
-  //   }
 
   const pointChunks: number[][] = points.reduce(
     (t: number[][], c, i) => (i % 2 ? t : [...t, points.slice(i, i + 2)]),
