@@ -12,7 +12,7 @@ import { KonvaEventObject } from "konva/lib/Node";
 import randomColor from "randomcolor";
 import uuid from "uuid/v1";
 import Konva from "konva";
-import { Layer, Stage, Image as KonvaImage } from "react-konva";
+import { Layer, Stage, Image as KonvaImage, Line } from "react-konva";
 import { useDispatch, useSelector } from "react-redux";
 import { AppState } from "../../store";
 import clsx from "clsx";
