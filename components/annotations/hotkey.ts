@@ -9,11 +9,14 @@ export const annotationHotKeyMap: KeyMap = {
     sequence: 'ctrl',
     action: 'keyup',
   },
-  NEXT_IMAGE: ['d', 'right'],
-  PREV_IMAGE: ['a', 'left'],
   CANCEL: ['esc'],
   UNDO: ['ctrl+z', 'command+z'],
+}
+export const toolbarHotkeymap: KeyMap = {
   TOOLBAR_UPLOAD: ['0'],
   TOOLBAR_POINTER: ['1'],
   TOOLBAR_POLYGON: ['2'],
+  TOOLBAR_TOOGLE_THUMBNAIL: ['4'],
+  NEXT_IMAGE: ['d', 'right'],
+  PREV_IMAGE: ['a', 'left'],
 }

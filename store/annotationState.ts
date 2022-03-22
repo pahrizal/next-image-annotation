@@ -77,7 +77,8 @@ export const actions = {
     }
   },
   setAnnotations: (
-    payload: typeof initialState.annotations
+    payload: typeof initialState.annotations,
+    current?: number
   ): ThunkAction<Actions | ToolbarActions> => {
     return async (dispatch, getState) => {
       dispatch({
@@ -103,6 +104,12 @@ export const actions = {
         type: actionsTypes.SET_BUSY,
         payload: false,
       })
+      if (current) {
+        dispatch({
+          type: actionsTypes.SET_CURRENT_INDEX,
+          payload: current,
+        })
+      }
     }
   },
   setCurrentIndex: (

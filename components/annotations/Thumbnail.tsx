@@ -1,8 +1,10 @@
 import clsx from 'clsx'
 import React, { useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
+import CloseIcon from '../../assets/icons/close-icon'
 import { AppState } from '../../store'
 import { actions } from '../../store/annotationState'
+import { toolbarActions } from '../../store/toolbarState'
 import ImagePreview from '../ImagePreview'
 
 type Props = {
@@ -16,9 +18,13 @@ const Thumbnail: React.FC<Props> = ({ position = 'bottom' }) => {
   const currentIndex = useSelector(
     (state: AppState) => state.annotation.currentIndex
   )
+  const show = useSelector((state: AppState) => state.toolbar.thumbnail)
   const dispatch = useDispatch()
   const container = React.useRef<HTMLDivElement>(null)
-  return (
+  const handleClose = () => {
+    dispatch(toolbarActions.toggleThumbnail())
+  }
+  return show ? (
     <div
       ref={container}
       className={clsx('fixed flex overflow-hidden border bg-slate-700', {
@@ -51,7 +57,15 @@ const Thumbnail: React.FC<Props> = ({ position = 'bottom' }) => {
           image={annotation.imageData}
         />
       ))}
+      <div
+        onClick={handleClose}
+        className="absolute top-1 right-1 flex h-[24px] w-[24px] items-center justify-center rounded-full bg-slate-100"
+      >
+        <CloseIcon width={16} height={16} strokeWidth={3} />
+      </div>
     </div>
+  ) : (
+    <></>
   )
 }
 

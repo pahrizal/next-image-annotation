@@ -298,6 +298,7 @@ const AnnotationCanvas: React.FC<Props> = ({
       }
     }
   }
+
   const handlePanningEnd = () => {
     const stage = stageRef.current
     if (stage) {
@@ -307,18 +308,22 @@ const AnnotationCanvas: React.FC<Props> = ({
     setLastDist(0)
     setPanning(false)
   }
-  const applyStageScale = (image: HTMLImageElement | CanvasImageSource) => {
-    const imageWidth = image.width as number
-    const imageHeight = image.width as number
-    const bestRatio = calculateAspectRatioFit(
-      imageWidth,
-      imageHeight,
-      screen.width,
-      screen.height
-    )
-    setStageScale({ x: bestRatio, y: bestRatio })
-    setImg(image)
+
+  const resetZoom = () => {
+    if (!img) return
+    if (!stageRef.current) return
+    const imageWidth = img.width as number
+    const imageHeight = img.height as number
+    const stage = stageRef.current
+    const currentPos = stage.getPosition()
+    const minScreenSize = Math.min(screen.width, screen.height)
+    const minMediaSize = Math.min(imageWidth, imageHeight)
+    setStageScale({
+      x: minScreenSize / minMediaSize,
+      y: minScreenSize / minMediaSize,
+    })
   }
+
   React.useEffect(() => {
     if (annotations.length > 0 && currentImageIndex >= 0) {
       const currentAnnotation = annotations[currentImageIndex]
@@ -327,7 +332,7 @@ const AnnotationCanvas: React.FC<Props> = ({
         setImg(newImg)
       })
     }
-  }, [annotations[currentImageIndex]])
+  }, [currentImageIndex])
 
   React.useEffect(() => {
     if (imagesProp.length > 0) {
@@ -336,7 +341,10 @@ const AnnotationCanvas: React.FC<Props> = ({
         imageData: img,
         annotations: [],
       }))
-      dispatch(AnnotationActions.setAnnotations(newAnnotations))
+      preloadImage(imagesProp[0]).then((newImg) => {
+        setImg(newImg)
+      })
+      dispatch(AnnotationActions.setAnnotations(newAnnotations, 0))
     }
     window.addEventListener('resize', function () {
       setScreen({ width: this.innerWidth, height: this.innerHeight })
@@ -353,32 +361,14 @@ const AnnotationCanvas: React.FC<Props> = ({
   }, [stageScale])
 
   // recalculate image size to fit the screen on resize
-  React.useEffect(() => {
-    if (!img) return
-    if (!stageRef.current) return
-    const imageWidth = img.width as number
-    const imageHeight = img.height as number
-    const stage = stageRef.current
-    const currentPos = stage.getPosition()
-    const minScreenSize = Math.min(screen.width, screen.height)
-    const minMediaSize = Math.min(imageWidth, imageHeight)
-    setStageScale({
-      x: minScreenSize / minMediaSize,
-      y: minScreenSize / minMediaSize,
-    })
-  }, [screen, img, currentImageIndex])
+  React.useEffect(resetZoom, [screen, img, currentImageIndex])
 
   const hotkeyHandlers = {
     PAN_Y: () => setWheelOp('pan-y'),
     PAN_X: () => setWheelOp('pan-x'),
     ZOOM: () => setWheelOp('zoom'),
-    NEXT_IMAGE: () => dispatch(AnnotationActions.nextImage()),
-    PREV_IMAGE: () => dispatch(AnnotationActions.previousImage()),
     CANCEL: () => setStarted(false),
     UNDO: () => dispatch(AnnotationActions.undoLastPoints()),
-    TOOLBAR_UPLOAD: () => dispatch(toolbarActions.setCurrent('upload')),
-    TOOLBAR_POINTER: () => dispatch(toolbarActions.setCurrent('pointer')),
-    TOOLBAR_POLYGON: () => dispatch(toolbarActions.setCurrent('polygon')),
   }
 
   return (
@@ -387,7 +377,7 @@ const AnnotationCanvas: React.FC<Props> = ({
         <GlobalHotKeys keyMap={annotationHotKeyMap} handlers={hotkeyHandlers}>
           <Stage
             className={clsx({
-              'cursor-pointer': currentToolbar === 'pointer',
+              'cursor-default': currentToolbar === 'pointer',
               'cursor-crosshair':
                 currentToolbar === 'rectangle' || currentToolbar === 'polygon',
             })}
