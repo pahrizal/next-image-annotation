@@ -471,24 +471,28 @@ const AnnotationCanvas: React.FC<Props> = ({
                 />
               )}
             </Layer>
-            {started && currentToolbar === "rectangle" && (
-              <Layer id="crosshair">
-                <Line
-                  dash={[4 / stageScale.x]}
-                  points={[cursorPos[0], 0, stageRef.current.width(), 0]}
-                  strokeColor={"#83CC18"}
-                  strokeWidth={1 / stageScale.x}
-                  ref={crosshairV}
-                />
-                <Line
-                  dash={[4 / stageScale.x]}
-                  points={[0, cursorPos[1], 0, stageRef.current.height()]}
-                  strokeColor={"#83CC18"}
-                  strokeWidth={1 / stageScale.x}
-                  ref={crosshairH}
-                />
-              </Layer>
-            )}
+            {started &&
+              currentToolbar === "rectangle" &&
+              cursorPos &&
+              cursorPos.length > 1 &&
+              stageRef.current && (
+                <Layer id="crosshair">
+                  <Line
+                    dash={[4 / stageScale.x]}
+                    points={[cursorPos[0], 0, stageRef.current.width(), 0]}
+                    strokeColor={"#83CC18"}
+                    strokeWidth={1 / stageScale.x}
+                    ref={crosshairV}
+                  />
+                  <Line
+                    dash={[4 / stageScale.x]}
+                    points={[0, cursorPos[1], 0, stageRef.current.height()]}
+                    strokeColor={"#83CC18"}
+                    strokeWidth={1 / stageScale.x}
+                    ref={crosshairH}
+                  />
+                </Layer>
+              )}
           </Stage>
           <Thumbnail />
           <Toolbar />
