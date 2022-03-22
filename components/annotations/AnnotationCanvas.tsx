@@ -373,6 +373,9 @@ const AnnotationCanvas: React.FC<Props> = ({
     PREV_IMAGE: () => dispatch(AnnotationActions.previousImage()),
     CANCEL: () => setStarted(false),
     UNDO: () => dispatch(AnnotationActions.undoLastPoints()),
+    TOOLBAR_UPLOAD: () => dispatch(toolbarActions.setCurrent('upload')),
+    TOOLBAR_POINTER: () => dispatch(toolbarActions.setCurrent('pointer')),
+    TOOLBAR_POLYGON: () => dispatch(toolbarActions.setCurrent('polygon')),
   }
 
   return (
@@ -440,8 +443,9 @@ const AnnotationCanvas: React.FC<Props> = ({
                       }}
                       key={i}
                       points={a.points}
-                      color={a.color}
-                      dotSize={6 / stageScale.x}
+                      strokeColor={a.color}
+                      fillColor={`${a.color}55`}
+                      dotSize={4 / stageScale.x}
                       strokeWidth={2 / stageScale.x}
                     />
                   ))}
@@ -450,7 +454,8 @@ const AnnotationCanvas: React.FC<Props> = ({
                   strokeWidth={2 / stageScale.x}
                   points={points}
                   dotSize={4 / stageScale.x}
-                  color={'#FFFFFF'}
+                  strokeColor={'#83CC18'}
+                  fillColor={'#83CC1844'}
                   showResizer
                 />
               )}

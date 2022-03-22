@@ -9,6 +9,7 @@ export type ToolbarConfig = {
     title: string
     icon: React.ReactNode
     href?: string
+    shortcut?: string
   }
 }
 export interface ToolbarState {

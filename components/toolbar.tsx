@@ -18,16 +18,24 @@ export const toolbars: ToolbarConfig = {
     enable: true,
     icon: <UploadIcon width={32} />,
     title: 'Upload',
+    shortcut: '0',
   },
-  pointer: { enable: true, icon: <PointerIcon width={32} />, title: 'Select' },
+  pointer: {
+    enable: true,
+    icon: <PointerIcon width={32} />,
+    title: 'Select',
+    shortcut: '1',
+  },
   polygon: {
     enable: true,
     icon: <PolygonIcon width={32} />,
     title: 'Polygon',
+    shortcut: '2',
   },
   rectangle: {
     enable: false,
     title: 'Rectangle',
+    shortcut: '3',
     icon: <RectangleIcon width={32} />,
   },
 }
@@ -42,7 +50,7 @@ const Toolbar = () => {
   return (
     <div
       className={clsx(
-        'left-center absolute top-1 flex h-[48px]  flex-row items-center justify-center rounded-xl border bg-white  px-[16px] shadow'
+        'left-center absolute top-1 flex  flex-row items-center justify-center rounded-xl border bg-white  px-[16px] shadow'
       )}
     >
       {Object.keys(toolbars)
@@ -54,7 +62,7 @@ const Toolbar = () => {
               <Link href={toolbar.href}>
                 <div
                   className={clsx(
-                    'flex h-[48px] w-[48px] cursor-pointer items-center justify-center px-3 text-black hover:bg-blue-600 hover:text-white',
+                    'flex h-[56px] w-[56px] cursor-pointer items-center justify-center px-3 text-black hover:bg-blue-600 hover:text-white',
                     {
                       'bg-blue-600 text-white': current === k,
                     }
@@ -69,13 +77,16 @@ const Toolbar = () => {
                 onClick={() => handleClick(k)}
                 title={toolbar.title}
                 className={clsx(
-                  'flex h-[48px] w-[48px] cursor-pointer items-center justify-center px-3 text-black hover:bg-blue-600 hover:text-white',
+                  'relative flex h-[56px] w-[56px] cursor-pointer items-center justify-center px-3 text-black hover:bg-blue-600 hover:text-white',
                   {
                     'bg-blue-600 text-white': current === k,
                   }
                 )}
               >
                 {toolbar.icon}
+                <div className="absolute bottom-[2px] right-[2px] flex h-[18px] w-[18px] items-center justify-center rounded-full bg-slate-600 p-1 text-xs text-white">
+                  {toolbar.shortcut}
+                </div>
               </div>
             )
           ) : (

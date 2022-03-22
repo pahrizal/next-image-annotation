@@ -10,7 +10,8 @@ type PolygonShapeProps = {
   selected?: boolean
   onSelect?: () => void
   points: number[]
-  color?: string
+  fillColor?: string
+  strokeColor?: string
   dotSize?: number
   strokeWidth?: number
   tension?: number
@@ -24,7 +25,8 @@ export default React.memo(function PolygonShape({
   selected = false,
   onSelect,
   points,
-  color = '#FFFFFF',
+  fillColor = '#FFFFFF',
+  strokeColor = '#FFFFFF22',
   dotSize = 8,
   strokeWidth = 1,
   tension = 0.01,
@@ -43,9 +45,9 @@ export default React.memo(function PolygonShape({
     <>
       <Line
         ref={lineRef}
-        fill={`${color}22`}
+        fill={fillColor}
         points={points}
-        stroke={color}
+        stroke={strokeColor}
         strokeWidth={strokeWidth}
         closed
         onMouseDown={onSelect}
