@@ -462,7 +462,7 @@ const AnnotationCanvas: React.FC<Props> = ({
                 />
               )}
               {started && currentToolbar === "rectangle" && (
-                <RectangleShape
+                <RectangleShape                
                   points={a.points}
                   strokeColor={"#83CC18"}
                   fillColor={"#83CC1844"}

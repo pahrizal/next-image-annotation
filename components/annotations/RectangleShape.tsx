@@ -3,11 +3,12 @@ import Konva from 'konva';
 import {Rect} from 'react-konva';
 
 type Props = {
-    id: string,
+    id?: string,
     points:number[]
     fillColor?: string,
     strokeColor?: string,
     strokeWidth?: number,
+    selected?:boolean,
 }
 const RectangleShape:React.FC<Props> = ({
     id,
@@ -15,6 +16,7 @@ const RectangleShape:React.FC<Props> = ({
     fillColor='#83CC1844',
     strokeColor='#83CC18',
     strokeWidth=4,
+    selected
 })=>{
     const ref = React.useRef<Konva.Rect>(null);
     return (
