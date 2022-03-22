@@ -471,8 +471,7 @@ const AnnotationCanvas: React.FC<Props> = ({
                 />
               )}
             </Layer>
-            {started &&
-              currentToolbar === "rectangle" &&
+            {currentToolbar === "rectangle" &&
               cursorPos &&
               cursorPos.length > 1 &&
               stageRef.current && (
