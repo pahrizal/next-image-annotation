@@ -28,7 +28,7 @@ import Thumbnail from "./Thumbnail";
 import UploadIcon from "../../assets/icons/upload-icon";
 import ImageUploader from "./ImageUploader";
 import Polygon from "./PolygonShape";
-import RectangularShape from "./RectangularShape";
+import RectangleShape from "./RectangleShape";
 import { intersection } from "./helper";
 
 type Screen = { width: number; height: number };

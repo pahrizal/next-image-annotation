@@ -9,7 +9,7 @@ type Props = {
     strokeColor?: string,
     strokeWidth?: number,
 }
-const RectangularShape:React.FC<Props> = ({
+const RectangleShape:React.FC<Props> = ({
     id,
     points,
     fillColor='#83CC1844',
@@ -33,4 +33,4 @@ const RectangularShape:React.FC<Props> = ({
     )
 }
 
-export default RectangularShape;
+export default RectangleShape;
