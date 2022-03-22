@@ -322,7 +322,7 @@ const AnnotationCanvas: React.FC<Props> = ({
   React.useEffect(() => {
     if (annotations.length > 0 && currentImageIndex >= 0) {
       const currentAnnotation = annotations[currentImageIndex]
-
+      if (!currentAnnotation) return
       preloadImage(currentAnnotation.imageData).then((newImg) => {
         setImg(newImg)
       })
@@ -360,10 +360,13 @@ const AnnotationCanvas: React.FC<Props> = ({
     const imageHeight = img.height as number
     const stage = stageRef.current
     const currentPos = stage.getPosition()
-    //TODO: set stage in center of current view port. Need to fix this (for now we force the zoom to fit the viewport)
-    const ratio = screen.height / imageHeight
-    // setStageScale({ x: ratio, y: ratio })
-  }, [screen, img])
+    const minScreenSize = Math.min(screen.width, screen.height)
+    const minMediaSize = Math.min(imageWidth, imageHeight)
+    setStageScale({
+      x: minScreenSize / minMediaSize,
+      y: minScreenSize / minMediaSize,
+    })
+  }, [screen, img, currentImageIndex])
 
   const hotkeyHandlers = {
     PAN_Y: () => setWheelOp('pan-y'),
