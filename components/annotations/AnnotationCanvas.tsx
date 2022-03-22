@@ -129,8 +129,7 @@ const AnnotationCanvas: React.FC<Props> = ({
         }
       } else if (currentToolbar === "rectangle") {
         // this time, click event is for the end of rect points
-        // so, calculate the width and height for the rect
-        started && dispatch(AnnotationActions.addPoints(cursorPos));
+        // so, finish drawing
         finishDrawing();
       }
     }
@@ -463,7 +462,7 @@ const AnnotationCanvas: React.FC<Props> = ({
               )}
               {started && currentToolbar === "rectangle" && (
                 <RectangleShape                
-                  points={a.points}
+                  points={points}
                   strokeColor={"#83CC18"}
                   fillColor={"#83CC1844"}
                   strokeWidth={2 / stageScale.x}
