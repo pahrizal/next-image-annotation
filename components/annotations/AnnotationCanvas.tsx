@@ -154,13 +154,12 @@ const AnnotationCanvas: React.FC<Props> = ({
           color,
         });
       } else if (currentToolbar === "rectangle") {
-        const newShape = {
+        currentAnnotation.annotations.push({
           id: uuid(),
           points,
           type: "rectangle",
           color,
-        };
-        currentAnnotation.annotations.push(newShape);
+        });
       }
       const newAnnotations = [
         ...annotations.filter((a) => a.id !== currentAnnotation.id),
