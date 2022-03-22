@@ -441,6 +441,7 @@ const AnnotationCanvas: React.FC<Props> = ({
                   } else if (a.type === "rectangle") {
                     return (
                       <RectangleShape
+                        id={a.id}
                         points={a.points}
                         key={i}
                         strokeColor={a.color}
