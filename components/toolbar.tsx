@@ -114,7 +114,7 @@ const Toolbar = () => {
                   onClick={toolbar.handler}
                   title={toolbar.title}
                   className={clsx(
-                    'relative flex h-[56px] w-[56px] cursor-pointer items-center justify-center text-black hover:bg-blue-600 hover:text-white',
+                    'relative flex h-[48px] w-[48px] cursor-pointer items-center justify-center text-black hover:bg-blue-600 hover:text-white',
                     {
                       'bg-blue-600 text-white': current === k,
                     }
