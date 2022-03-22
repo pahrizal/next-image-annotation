@@ -57,12 +57,6 @@ const Thumbnail: React.FC<Props> = ({ position = 'bottom' }) => {
           image={annotation.imageData}
         />
       ))}
-      <div
-        onClick={handleClose}
-        className="absolute top-1 right-1 flex h-[24px] w-[24px] items-center justify-center rounded-full bg-slate-100"
-      >
-        <CloseIcon width={16} height={16} strokeWidth={3} />
-      </div>
     </div>
   ) : (
     <></>
