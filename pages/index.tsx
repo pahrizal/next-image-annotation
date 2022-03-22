@@ -17,7 +17,7 @@ const Home: NextPage = () => {
   React.useEffect(() => {
     dispatch(toolbarActions.setBusy(true))
   }, [])
-  return <AnnotationCanvas images={[]} />
+  return <AnnotationCanvas images={[imageURL]} />
 }
 
 export default Home

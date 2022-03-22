@@ -20,23 +20,27 @@ export interface State {
   busy: boolean
   annotations: ImageAnnotation[]
   currentIndex: number
+  currentPoints: number[]
 }
 export const initialState: State = {
   busy: false,
   annotations: [],
-  currentIndex: 1,
+  currentIndex: 0,
+  currentPoints: [],
 }
 
 interface ActionTypes {
   readonly SET_BUSY: 'SET_BUSY'
   readonly SET_ANNOTATIONS: 'SET_ANNOTATIONS'
   readonly SET_CURRENT_INDEX: 'SET_CURRENT_INDEX'
+  readonly SET_CURRENT_POINTS: 'SET_CURRENT_POINTS'
 }
 
 const actionsTypes: ActionTypes = {
   SET_BUSY: 'SET_BUSY',
   SET_CURRENT_INDEX: 'SET_CURRENT_INDEX',
   SET_ANNOTATIONS: 'SET_ANNOTATIONS',
+  SET_CURRENT_POINTS: 'SET_CURRENT_POINTS',
 }
 
 interface SetBusy {
@@ -52,7 +56,16 @@ interface SetAnnotations {
   payload: typeof initialState.annotations
 }
 
-export type Actions = SetBusy | SetAnnotations | SetCurrentIndex
+interface SetCurrentPoints {
+  type: 'SET_CURRENT_POINTS'
+  payload: typeof initialState.currentPoints
+}
+
+export type Actions =
+  | SetBusy
+  | SetAnnotations
+  | SetCurrentIndex
+  | SetCurrentPoints
 
 export const actions = {
   setBusy: (payload: typeof initialState.busy): ThunkAction<Actions> => {
@@ -90,7 +103,6 @@ export const actions = {
         type: actionsTypes.SET_BUSY,
         payload: false,
       })
-      toolbarActions.setCurrent('pointer')(dispatch, getState)
     }
   },
   setCurrentIndex: (
@@ -128,6 +140,36 @@ export const actions = {
       })
     }
   },
+  setCurrentPoints: (
+    payload: typeof initialState.currentPoints
+  ): ThunkAction<Actions> => {
+    return async (dispatch, getState) => {
+      dispatch({
+        type: actionsTypes.SET_CURRENT_POINTS,
+        payload,
+      })
+    }
+  },
+  addPoints: (
+    payload: typeof initialState.currentPoints
+  ): ThunkAction<Actions> => {
+    return async (dispatch, getState) => {
+      const points = getState().annotation.currentPoints
+      dispatch({
+        type: actionsTypes.SET_CURRENT_POINTS,
+        payload: [...points, ...payload],
+      })
+    }
+  },
+  undoLastPoints: (): ThunkAction<Actions> => {
+    return async (dispatch, getState) => {
+      const points = getState().annotation.currentPoints
+      dispatch({
+        type: actionsTypes.SET_CURRENT_POINTS,
+        payload: points.slice(0, -2),
+      })
+    }
+  },
 }
 export const reducer: Reducer<State, Actions> = (
   state: State | undefined,
@@ -152,6 +194,11 @@ export const reducer: Reducer<State, Actions> = (
       return {
         ...state,
         currentIndex: action.payload,
+      }
+    case actionsTypes.SET_CURRENT_POINTS:
+      return {
+        ...state,
+        currentPoints: action.payload,
       }
     default:
       return state

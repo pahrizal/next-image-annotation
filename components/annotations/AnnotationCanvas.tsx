@@ -29,10 +29,42 @@ import UploadIcon from '../../assets/icons/upload-icon'
 import ImageUploader from './ImageUploader'
 import Polygon from './PolygonShape'
 type Screen = { width: number; height: number }
-type WheelOp = 'drag' | 'zoom'
+type WheelOp = 'pan-x' | 'pan-y' | 'zoom'
 type ImageList = CanvasImageSource | string
 
 const SCROLL_SMOOTHING_VACTOR = 0.3
+function intersection(
+  x0: number,
+  y0: number,
+  r0: number,
+  x1: number,
+  y1: number,
+  r1: number
+) {
+  var a, dx, dy, d, h, rx, ry
+  var x2, y2
+
+  /* dx and dy are the vertical and horizontal distances between
+   * the circle centers.
+   */
+  dx = x1 - x0
+  dy = y1 - y0
+
+  /* Determine the straight-line distance between the centers. */
+  d = Math.sqrt(dy * dy + dx * dx)
+
+  /* Check for solvability. */
+  if (d > r0 + r1) {
+    /* no solution. circles do not intersect. */
+    return false
+  }
+
+  if (d < Math.abs(r0 - r1)) {
+    /* one circle is contained in the other */
+    return true
+  }
+  return false
+}
 type Props = {
   width?: number
   height?: number
@@ -58,6 +90,9 @@ const AnnotationCanvas: React.FC<Props> = ({
   const currentImageIndex = useSelector(
     (state: AppState) => state.annotation.currentIndex
   )
+  const points = useSelector(
+    (state: AppState) => state.annotation.currentPoints
+  )
   const stageRef = React.useRef<StageType>(null)
   const imageRef = React.useRef<Konva.Image>(null)
   const [lastCenter, setLastCenter] = React.useState<Vector2d | null>(null)
@@ -66,7 +101,7 @@ const AnnotationCanvas: React.FC<Props> = ({
     x: 1,
     y: 1,
   })
-  const [points, setPoints] = React.useState<number[]>([])
+  //   const [points, setPoints] = React.useState<number[]>([])
   const [cursorPos, setCursorPos] = React.useState<[number, number]>([0, 0])
   const [panning, setPanning] = React.useState(false)
   const [started, setStarted] = React.useState(false)
@@ -79,12 +114,6 @@ const AnnotationCanvas: React.FC<Props> = ({
     width,
     height,
   })
-  const hotkeyHandlers = {
-    PAN: () => setWheelOp('drag'),
-    ZOOM: () => setWheelOp('zoom'),
-    NEXT_IMAGE: () => dispatch(AnnotationActions.nextImage()),
-    PREV_IMAGE: () => dispatch(AnnotationActions.previousImage()),
-  }
 
   const handleClick = (event: KonvaEventObject<MouseEvent>) => {
     const stage = event.target.getStage()
@@ -94,7 +123,7 @@ const AnnotationCanvas: React.FC<Props> = ({
       const scale = stage.scaleX()
       const pointer = stage.getPointerPosition()
       if (!pointer) return
-      setPoints(cursorPos)
+      dispatch(AnnotationActions.setCurrentPoints(cursorPos))
       setStarted(true)
       dispatch(toolbarActions.setBusy(true))
       setColor(randomColor())
@@ -103,7 +132,21 @@ const AnnotationCanvas: React.FC<Props> = ({
       if (prevPoints.length === 0) {
         prevPoints = points
       }
-      started && setPoints([...points, ...cursorPos])
+      // check if current point is in starting point
+      const radius = 4 / stageScale.x
+      const isAtStartPoint = intersection(
+        points[0],
+        points[1],
+        radius,
+        cursorPos[0],
+        cursorPos[1],
+        12 / stageScale.x
+      )
+      if (isAtStartPoint) {
+        finishDrawing()
+      } else {
+        started && dispatch(AnnotationActions.addPoints(cursorPos))
+      }
     }
     // if clicked outside annotation shape, close the shape
     if (selectedId && imageRef.current && event.target === imageRef.current) {
@@ -111,11 +154,11 @@ const AnnotationCanvas: React.FC<Props> = ({
       dispatch(toolbarActions.setBusy(false))
     }
   }
-  const handleDoubleClick = (event: KonvaEventObject<MouseEvent>) => {
+  const finishDrawing = React.useCallback(() => {
     if (started) {
       // escape last points
       let newPoints = points.slice(0, -2)
-      setPoints(newPoints)
+      dispatch(AnnotationActions.setCurrentPoints(newPoints))
       setStarted(false)
       // if we have points, store it as a new annotations
       const currentAnnotation = annotations[currentImageIndex]
@@ -131,7 +174,7 @@ const AnnotationCanvas: React.FC<Props> = ({
       ].sort((a, b) => a.id.localeCompare(b.id))
       dispatch(AnnotationActions.setAnnotations(newAnnotations))
     }
-  }
+  }, [started, points, annotations[currentImageIndex]])
 
   const handleMouseMove = (event: KonvaEventObject<MouseEvent>) => {
     const stage = event.target.getStage()
@@ -151,7 +194,7 @@ const AnnotationCanvas: React.FC<Props> = ({
       if (prevPoints.length === 0) {
         prevPoints = points
       }
-      setPoints([...prevPoints, x, y])
+      dispatch(AnnotationActions.setCurrentPoints([...prevPoints, x, y]))
     }
   }
   const handleWheel = (event: KonvaEventObject<WheelEvent>) => {
@@ -178,10 +221,16 @@ const AnnotationCanvas: React.FC<Props> = ({
         }
         stage.position(newPos)
         stage.batchDraw()
-      } else if (wheelOp === 'drag') {
+      } else if (wheelOp === 'pan-y') {
         const newPos = {
           x: oldPos.x,
           y: oldPos.y + event.evt.deltaY * SCROLL_SMOOTHING_VACTOR,
+        }
+        stage.position(newPos)
+      } else if (wheelOp === 'pan-x') {
+        const newPos = {
+          x: oldPos.x + event.evt.deltaY * SCROLL_SMOOTHING_VACTOR,
+          y: oldPos.y,
         }
         stage.position(newPos)
       }
@@ -278,7 +327,7 @@ const AnnotationCanvas: React.FC<Props> = ({
         setImg(newImg)
       })
     }
-  }, [currentImageIndex, annotations])
+  }, [annotations[currentImageIndex]])
 
   React.useEffect(() => {
     if (imagesProp.length > 0) {
@@ -313,8 +362,18 @@ const AnnotationCanvas: React.FC<Props> = ({
     const currentPos = stage.getPosition()
     //TODO: set stage in center of current view port. Need to fix this (for now we force the zoom to fit the viewport)
     const ratio = screen.height / imageHeight
-    setStageScale({ x: ratio, y: ratio })
+    // setStageScale({ x: ratio, y: ratio })
   }, [screen, img])
+
+  const hotkeyHandlers = {
+    PAN_Y: () => setWheelOp('pan-y'),
+    PAN_X: () => setWheelOp('pan-x'),
+    ZOOM: () => setWheelOp('zoom'),
+    NEXT_IMAGE: () => dispatch(AnnotationActions.nextImage()),
+    PREV_IMAGE: () => dispatch(AnnotationActions.previousImage()),
+    CANCEL: () => setStarted(false),
+    UNDO: () => dispatch(AnnotationActions.undoLastPoints()),
+  }
 
   return (
     <div className="fixed flex h-screen w-screen flex-col items-center justify-center bg-white">
@@ -342,55 +401,57 @@ const AnnotationCanvas: React.FC<Props> = ({
             ref={stageRef}
             scale={stageScale}
             onClick={handleClick}
-            onDblClick={handleDoubleClick}
           >
             <Layer id="image-layer">
               <KonvaImage ref={imageRef} image={img} />
             </Layer>
             <Layer>
-              {annotations[currentImageIndex].annotations
-                .filter((a) => a.type === 'polygon')
-                .map((a, i) => (
-                  <Polygon
-                    onSelect={() => setSelectedId(a.id)}
-                    selected={a.id === selectedId}
-                    onResize={(newPoints) => {
-                      const currentAnnotation = annotations[currentImageIndex]
-                      const newPolygon = currentAnnotation.annotations.find(
-                        (x) => x.id === a.id
-                      )
-                      if (newPolygon) {
-                        newPolygon.points = newPoints
-                        dispatch(
-                          AnnotationActions.setAnnotations([
-                            ...annotations.filter(
-                              (xx) => xx.id !== currentAnnotation.id
-                            ),
-                            {
-                              ...currentAnnotation,
-                              annotations: [
-                                ...currentAnnotation.annotations.filter(
-                                  (aaa) => aaa.id !== a.id
-                                ),
-                                newPolygon,
-                              ],
-                            },
-                          ])
+              {annotations.length > currentImageIndex &&
+                annotations[currentImageIndex].annotations
+                  .filter((a) => a.type === 'polygon')
+                  .map((a, i) => (
+                    <Polygon
+                      onSelect={() => setSelectedId(a.id)}
+                      selected={a.id === selectedId}
+                      onResize={(newPoints) => {
+                        const currentAnnotation = annotations[currentImageIndex]
+                        const newPolygon = currentAnnotation.annotations.find(
+                          (x) => x.id === a.id
                         )
-                      }
-                    }}
-                    key={i}
-                    points={a.points}
-                    color={a.color}
-                    dotSize={4 / stageScale.x}
-                    strokeWidth={1 / stageScale.x}
-                  />
-                ))}
+                        if (newPolygon) {
+                          newPolygon.points = newPoints
+                          dispatch(
+                            AnnotationActions.setAnnotations([
+                              ...annotations.filter(
+                                (xx) => xx.id !== currentAnnotation.id
+                              ),
+                              {
+                                ...currentAnnotation,
+                                annotations: [
+                                  ...currentAnnotation.annotations.filter(
+                                    (aaa) => aaa.id !== a.id
+                                  ),
+                                  newPolygon,
+                                ],
+                              },
+                            ])
+                          )
+                        }
+                      }}
+                      key={i}
+                      points={a.points}
+                      color={a.color}
+                      dotSize={6 / stageScale.x}
+                      strokeWidth={2 / stageScale.x}
+                    />
+                  ))}
               {started && (
                 <Polygon
-                  strokeWidth={1 / stageScale.x}
+                  strokeWidth={2 / stageScale.x}
                   points={points}
+                  dotSize={4 / stageScale.x}
                   color={'#FFFFFF'}
+                  showResizer
                 />
               )}
             </Layer>
@@ -423,4 +484,4 @@ const AnnotationCanvas: React.FC<Props> = ({
   )
 }
 
-export default React.memo(AnnotationCanvas)
+export default AnnotationCanvas
