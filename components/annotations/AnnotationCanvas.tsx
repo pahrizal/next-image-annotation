@@ -69,6 +69,8 @@ const AnnotationCanvas: React.FC<Props> = ({
   );
   const stageRef = React.useRef<StageType>(null);
   const imageRef = React.useRef<Konva.Image>(null);
+  const crosshairV = React.useRef<Konva.Line>(null);
+  const crosshairH = React.useRef<Konva.Line>(null);
   const [lastCenter, setLastCenter] = React.useState<Vector2d | null>(null);
   const [lastDist, setLastDist] = React.useState<number>(0);
   const [stageScale, setStageScale] = React.useState<Vector2d>({
@@ -461,7 +463,7 @@ const AnnotationCanvas: React.FC<Props> = ({
                 />
               )}
               {started && currentToolbar === "rectangle" && (
-                <RectangleShape                
+                <RectangleShape
                   points={points}
                   strokeColor={"#83CC18"}
                   fillColor={"#83CC1844"}
@@ -469,6 +471,24 @@ const AnnotationCanvas: React.FC<Props> = ({
                 />
               )}
             </Layer>
+            {started && currentToolbar === "rectangle" && (
+              <Layer id="crosshair">
+                <Line
+                  dash={[4 / stageScale.x]}
+                  points={[cursorPos[0], 0, stageRef.current.width(), 0]}
+                  strokeColor={"#83CC18"}
+                  strokeWidth={1 / stageScale.x}
+                  ref={crosshairV}
+                />
+                <Line
+                  dash={[4 / stageScale.x]}
+                  points={[0, cursorPos[1], 0, stageRef.current.height()]}
+                  strokeColor={"#83CC18"}
+                  strokeWidth={1 / stageScale.x}
+                  ref={crosshairH}
+                />
+              </Layer>
+            )}
           </Stage>
           <Thumbnail />
           <Toolbar />
