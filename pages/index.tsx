@@ -2,10 +2,9 @@ import type { NextPage } from 'next'
 import dynamic from 'next/dynamic'
 import React from 'react'
 import { useDispatch } from 'react-redux'
-import Toolbar from '../components/toolbar'
-import { toolbarActions } from '../store/toolbar-state'
+import { toolbarActions } from '../store/toolbarState'
 const AnnotationCanvas = dynamic(
-  () => import('../components/annotation-canvas'),
+  () => import('../components/annotations/AnnotationCanvas'),
   {
     ssr: false,
   }
@@ -18,12 +17,7 @@ const Home: NextPage = () => {
   React.useEffect(() => {
     dispatch(toolbarActions.setBusy(true))
   }, [])
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center py-2">
-      <AnnotationCanvas image={imageURL} />
-      <Toolbar />
-    </div>
-  )
+  return <AnnotationCanvas images={[imageURL]} />
 }
 
 export default Home

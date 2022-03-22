@@ -5,7 +5,7 @@ const ReactangleIcon: React.FC<SVGProps<SVGSVGElement>> = (props) => {
     <svg
       width="24px"
       height="24px"
-      viewBox="0 0 24 24"
+      viewBox="0 0 34 34"
       role="img"
       xmlns="http://www.w3.org/2000/svg"
       aria-labelledby="rectangleIconTitle"
@@ -18,7 +18,7 @@ const ReactangleIcon: React.FC<SVGProps<SVGSVGElement>> = (props) => {
       {...props}
     >
       <title id="rectangleIconTitle">{'Rectangle'}</title>
-      <rect width={18} height={18} x={3} y={3} />
+      <rect width={32} height={32} x={1} y={1} />
     </svg>
   )
 }

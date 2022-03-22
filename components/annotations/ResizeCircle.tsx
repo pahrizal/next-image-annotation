@@ -7,22 +7,24 @@ type Props = {
   points: number[]
   size?: number
   strokeWidth?: number
-  onDragMove: (idx: number, pos: number[]) => void
-  onDragEnd: (idx: number, pos: number[]) => void
+  draggable?: boolean
+  onDragMove?: (idx: number, pos: number[]) => void
+  onDragEnd?: (idx: number, pos: number[]) => void
 }
-export default function ResizeHelperCircle({
+export default function ResizeCircle({
   pointIdx,
   points,
   size = 4,
   onDragMove,
   onDragEnd,
   strokeWidth = 1,
+  draggable = true,
 }: Props) {
   const ref = useRef<Konva.Circle>(null)
   return (
     <Circle
       ref={ref}
-      draggable
+      draggable={draggable}
       x={points[0]}
       y={points[1]}
       fill="transparent"
@@ -47,3 +49,4 @@ export default function ResizeHelperCircle({
     />
   )
 }
+

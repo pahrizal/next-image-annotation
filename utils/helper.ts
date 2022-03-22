@@ -39,3 +39,14 @@ export const calculateAspectRatioFit = (
 
   return ratio
 }
+
+export async function uploadMultipart(url: string, formData: FormData) {
+  const response = await fetch(url, {
+    method: 'post',
+    body: formData,
+  })
+  if (response.status === 200) {
+    return response
+  }
+}
+
