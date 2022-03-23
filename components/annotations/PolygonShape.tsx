@@ -2,7 +2,12 @@ import Konva from 'konva'
 import { KonvaEventObject } from 'konva/lib/Node'
 import * as React from 'react'
 import { Circle, Line, Rect } from 'react-konva'
-import { interpolate } from './helper'
+import {
+  getPointChunk,
+  getRectangleAreaFromPolygon,
+  interpolate,
+} from './helper'
+import Label from './Label'
 import PointAdd from './PointAdd'
 import ResizerHelperCircle from './ResizeCircle'
 type PolygonShapeProps = {
@@ -18,6 +23,8 @@ type PolygonShapeProps = {
   showResizer?: boolean
   onResize?: (points: number[]) => void
   onAddPoint?: (points: number[]) => void
+  label?: string
+  onLabelEdit?: (label: string | null) => void
 }
 
 export default React.memo(function PolygonShape({
@@ -33,14 +40,18 @@ export default React.memo(function PolygonShape({
   onResize,
   showResizer,
   onAddPoint,
+  label,
+  onLabelEdit,
 }: PolygonShapeProps) {
   const lineRef = React.useRef<Konva.Line>(null)
-
-  const pointChunks: number[][] = points.reduce(
-    (t: number[][], c, i) => (i % 2 ? t : [...t, points.slice(i, i + 2)]),
-    []
-  )
-
+  const [newPoints, setNewPoints] = React.useState(points)
+  const [showLabel, setShowLabel] = React.useState(false)
+  const [resizerPoint, setResizerPoint] = React.useState(getPointChunk(points))
+  const rectArea = getRectangleAreaFromPolygon(resizerPoint)
+  const editLabel = () => {
+    const newLabel = prompt('new label', label)
+    onLabelEdit && onLabelEdit(newLabel)
+  }
   return (
     <>
       <Line
@@ -52,41 +63,47 @@ export default React.memo(function PolygonShape({
         closed
         onMouseDown={onSelect}
         tension={tension}
+        onMouseEnter={() => setShowLabel(true)}
+        onMouseLeave={() => setShowLabel(false)}
+        onDblClick={() => editLabel()}
       />
       {selected &&
-        pointChunks.map((pts, j) => (
+        resizerPoint.map((pts, j) => (
           <>
             <PointAdd
               key={`dot-add-${j}`}
               points={interpolate(
                 pts[0],
                 pts[1],
-                pointChunks[j + 1 > pointChunks.length - 1 ? 0 : j + 1][0],
-                pointChunks[j + 1 > pointChunks.length - 1 ? 0 : j + 1][1]
+                resizerPoint[j + 1 > resizerPoint.length - 1 ? 0 : j + 1][0],
+                resizerPoint[j + 1 > resizerPoint.length - 1 ? 0 : j + 1][1]
               )}
               strokeWidth={strokeWidth}
               size={dotSize}
               onClick={(added) => {
                 const oldPoints = [...lineRef.current!!.points()]
-                const newPoints = [
+                const npoints = [
                   ...oldPoints.slice(0, j * 2 + 2),
                   ...added,
                   ...oldPoints.slice(j * 2 + 2),
                 ]
-                lineRef.current!!.points(newPoints)
-                onResize && onResize(newPoints)
+                setResizerPoint(getPointChunk(npoints))
+                lineRef.current!!.points(npoints)
+                onResize && onResize(npoints)
               }}
             />
             <ResizerHelperCircle
               onDragMove={(id, pos) => {
                 const oldPoints = [...lineRef.current!!.points()]
-                const newPoints = [
+                const npoints = [
                   ...oldPoints.slice(0, id * 2),
                   pos[0],
                   pos[1],
                   ...oldPoints.slice(id * 2 + 2),
                 ]
-                lineRef.current!!.points(newPoints)
+                lineRef.current!!.points(npoints)
+                setResizerPoint(getPointChunk(npoints))
+                setNewPoints(npoints)
               }}
               onDragEnd={(id, pos) => {
                 onResize && onResize(lineRef.current!!.points())
@@ -100,7 +117,7 @@ export default React.memo(function PolygonShape({
           </>
         ))}
       {showResizer &&
-        pointChunks
+        getPointChunk(points)
           .slice(0, -1)
           .map((pts, i) => (
             <ResizerHelperCircle
@@ -111,6 +128,9 @@ export default React.memo(function PolygonShape({
               strokeWidth={strokeWidth}
             />
           ))}
+      {label && (selected || showLabel) && (
+        <Label text={label} points={rectArea} />
+      )}
     </>
   )
 })

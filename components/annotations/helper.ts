@@ -22,7 +22,7 @@ export function interpolate(
 }
 
 /**
- * 
+ *
  * @param x0 x-coordinate of source point
  * @param y0 y-coordinate of source point
  * @param r0 radius of source point
@@ -62,4 +62,17 @@ export function intersection(
     return true
   }
   return false
+}
+
+export const getPointChunk = (points:number[])=>points.reduce(
+  (t: number[][], c, i) => (i % 2 ? t : [...t, points.slice(i, i + 2)]),
+  []
+)
+
+export const getRectangleAreaFromPolygon = (pointChunks:number[][])=>{
+    const xMin = Math.min(...pointChunks.map(x=>x[0]))
+    const xMax = Math.max(...pointChunks.map(x=>x[0]))
+    const yMin = Math.min(...pointChunks.map(x=>x[1]))
+    const yMax = Math.max(...pointChunks.map(x=>x[1]))
+    return [xMin,yMin, xMax,yMax]
 }

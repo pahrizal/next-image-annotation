@@ -1,35 +1,36 @@
-import * as React from "react";
+import * as React from 'react'
 import {
   calculateAspectRatioFit,
   getCenter,
   getDistance,
   isTouchEnabled,
   preloadImage,
-} from "../../utils/helper";
-import { Vector2d } from "konva/lib/types";
-import { Stage as StageType } from "konva/lib/Stage";
-import { KonvaEventObject } from "konva/lib/Node";
-import randomColor from "randomcolor";
-import uuid from "uuid/v1";
-import Konva from "konva";
-import { Layer, Stage, Image as KonvaImage, Line } from "react-konva";
-import { useDispatch, useSelector } from "react-redux";
-import { AppState } from "../../store";
-import clsx from "clsx";
-import { toolbarActions } from "../../store/toolbarState";
-import { annotationHotKeyMap } from "./hotkey";
-import Toolbar from "../toolbar";
-import { GlobalHotKeys, HotKeys } from "react-hotkeys";
+} from '../../utils/helper'
+import { Vector2d } from 'konva/lib/types'
+import { Stage as StageType } from 'konva/lib/Stage'
+import { KonvaEventObject } from 'konva/lib/Node'
+import randomColor from 'randomcolor'
+import uuid from 'uuid/v1'
+import Konva from 'konva'
+import { Layer, Stage, Image as KonvaImage, Line } from 'react-konva'
+import { useDispatch, useSelector } from 'react-redux'
+import { AppState } from '../../store'
+import clsx from 'clsx'
+import { toolbarActions } from '../../store/toolbarState'
+import { annotationHotKeyMap } from './hotkey'
+import Toolbar from '../toolbar'
+import { GlobalHotKeys, HotKeys } from 'react-hotkeys'
 import {
   actions as AnnotationActions,
+  BaseAnnotation,
   ImageAnnotation,
-} from "../../store/annotationState";
-import Thumbnail from "./Thumbnail";
-import UploadIcon from "../../assets/icons/upload-icon";
-import ImageUploader from "./ImageUploader";
-import Polygon from "./PolygonShape";
-import RectangleShape from "./RectangleShape";
-import { intersection } from "./helper";
+} from '../../store/annotationState'
+import Thumbnail from './Thumbnail'
+import UploadIcon from '../../assets/icons/upload-icon'
+import ImageUploader from './ImageUploader'
+import Polygon from './PolygonShape'
+import RectangleShape from './RectangleShape'
+import { intersection } from './helper'
 import Crosshair from './Crosshair'
 
 type Screen = { width: number; height: number }
@@ -143,25 +144,27 @@ const AnnotationCanvas: React.FC<Props> = ({
   const finishDrawing = React.useCallback(() => {
     const currentAnnotation = annotations[currentImageIndex]
     if (started && currentAnnotation) {
+      const label = prompt(
+        'Type label name for this annotation',
+        'new annotation'
+      )
+      const newShape: BaseAnnotation = {
+        id: uuid(),
+        points,
+        type: 'polygon',
+        label: label || 'new annotation',
+        color,
+      }
       if (currentToolbar === 'polygon') {
         // escape last points, since polygon will close it self
         let newPoints = points.slice(0, -2)
         dispatch(AnnotationActions.setCurrentPoints(newPoints))
-        // if we have points, store it as a new annotations
-        currentAnnotation.annotations.push({
-          id: uuid(),
-          points: newPoints,
-          type: 'polygon',
-          color,
-        })
+        newShape.points = newPoints
+        newShape.type = 'polygon'
       } else if (currentToolbar === 'rectangle') {
-        currentAnnotation.annotations.push({
-          id: uuid(),
-          points,
-          type: 'rectangle',
-          color,
-        })
+        newShape.type = 'rectangle'
       }
+      currentAnnotation.shapes.push(newShape)
       const newAnnotations = [
         ...annotations.filter((a) => a.id !== currentAnnotation.id),
         currentAnnotation,
@@ -334,7 +337,7 @@ const AnnotationCanvas: React.FC<Props> = ({
       const newAnnotations: ImageAnnotation[] = imagesProp.map((img) => ({
         id: uuid(),
         imageData: img,
-        annotations: [],
+        shapes: [],
       }))
       preloadImage(imagesProp[0]).then((newImg) => {
         setImg(newImg)
@@ -358,6 +361,29 @@ const AnnotationCanvas: React.FC<Props> = ({
   // recalculate image size to fit the screen on resize
   React.useEffect(resizeStage, [screen, img, currentImageIndex])
 
+  const saveAnnotation = (annotationId: string | null, newPoints: number[]) => {
+    const currentAnnotation = annotations[currentImageIndex]
+    const currentShape = currentAnnotation.shapes.find(
+      (x) => x.id === annotationId
+    )
+    if (currentShape) {
+      currentShape.points = newPoints
+      dispatch(
+        AnnotationActions.setAnnotations([
+          ...annotations.filter((xx) => xx.id !== currentAnnotation.id),
+          {
+            ...currentAnnotation,
+            shapes: [
+              ...currentAnnotation.shapes.filter(
+                (aaa) => aaa.id !== annotationId
+              ),
+              currentShape,
+            ],
+          },
+        ])
+      )
+    }
+  }
   const hotkeyHandlers = {
     PAN_Y: () => setWheelOp('pan-y'),
     PAN_X: () => setWheelOp('pan-x'),
@@ -372,7 +398,7 @@ const AnnotationCanvas: React.FC<Props> = ({
         <GlobalHotKeys keyMap={annotationHotKeyMap} handlers={hotkeyHandlers}>
           <Stage
             className={clsx({
-              'cursor-default': currentToolbar === 'pointer',
+              'cursor-default': currentToolbar === 'pointer' || selectedId,
               'cursor-crosshair':
                 currentToolbar === 'rectangle' || currentToolbar === 'polygon',
             })}
@@ -398,37 +424,14 @@ const AnnotationCanvas: React.FC<Props> = ({
             </Layer>
             <Layer>
               {annotations.length > currentImageIndex &&
-                annotations[currentImageIndex].annotations.map((a, i) => {
+                annotations[currentImageIndex].shapes.map((a, i) => {
                   if (a.type === 'polygon') {
                     return (
                       <Polygon
                         onSelect={() => setSelectedId(a.id)}
                         selected={a.id === selectedId}
                         onResize={(newPoints) => {
-                          const currentAnnotation =
-                            annotations[currentImageIndex]
-                          const newPolygon = currentAnnotation.annotations.find(
-                            (x) => x.id === a.id
-                          )
-                          if (newPolygon) {
-                            newPolygon.points = newPoints
-                            dispatch(
-                              AnnotationActions.setAnnotations([
-                                ...annotations.filter(
-                                  (xx) => xx.id !== currentAnnotation.id
-                                ),
-                                {
-                                  ...currentAnnotation,
-                                  annotations: [
-                                    ...currentAnnotation.annotations.filter(
-                                      (aaa) => aaa.id !== a.id
-                                    ),
-                                    newPolygon,
-                                  ],
-                                },
-                              ])
-                            )
-                          }
+                          saveAnnotation(a.id, newPoints)
                         }}
                         key={i}
                         points={a.points}
@@ -436,6 +439,15 @@ const AnnotationCanvas: React.FC<Props> = ({
                         fillColor={`${a.color}55`}
                         dotSize={4 / stageScale.x}
                         strokeWidth={1 / stageScale.x}
+                        label={a.label}
+                        onLabelEdit={(newLabel) => {
+                          dispatch(
+                            AnnotationActions.changeShapeLabel(
+                              a.id,
+                              newLabel || ''
+                            )
+                          )
+                        }}
                       />
                     )
                   } else if (a.type === 'rectangle') {
@@ -443,10 +455,25 @@ const AnnotationCanvas: React.FC<Props> = ({
                       <RectangleShape
                         id={a.id}
                         points={a.points}
-                        key={i}
+                        dotSize={4 / stageScale.x}
+                        selected={a.id === selectedId}
+                        onSelect={() => setSelectedId(a.id)}
+                        key={`rect-${i}`}
                         strokeColor={a.color}
                         fillColor={`${a.color}55`}
                         strokeWidth={1 / stageScale.x}
+                        onResize={(id, points) => {
+                          saveAnnotation(id, points)
+                        }}
+                        label={a.label}
+                        onLabelEdit={(newLabel) => {
+                          dispatch(
+                            AnnotationActions.changeShapeLabel(
+                              a.id,
+                              newLabel || ''
+                            )
+                          )
+                        }}
                       />
                     )
                   }
@@ -463,6 +490,8 @@ const AnnotationCanvas: React.FC<Props> = ({
               )}
               {started && currentToolbar === 'rectangle' && (
                 <RectangleShape
+                  id={null}
+                  dotSize={4 / stageScale.x}
                   points={points}
                   strokeColor={'#83CC18'}
                   fillColor={'#83CC1844'}
@@ -470,7 +499,8 @@ const AnnotationCanvas: React.FC<Props> = ({
                 />
               )}
             </Layer>
-            {currentToolbar === 'rectangle' &&
+            {!selectedId &&
+              currentToolbar === 'rectangle' &&
               img &&
               cursorPos &&
               cursorPos.length > 1 &&
@@ -496,7 +526,7 @@ const AnnotationCanvas: React.FC<Props> = ({
               const newAnnotations: ImageAnnotation[] = files.map((f) => ({
                 id: uuid(),
                 imageData: f,
-                annotations: [],
+                shapes: [],
               }))
               dispatch(
                 AnnotationActions.setAnnotations([
@@ -512,4 +542,4 @@ const AnnotationCanvas: React.FC<Props> = ({
   )
 }
 
-export default AnnotationCanvas;
+export default AnnotationCanvas
