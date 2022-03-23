@@ -19,7 +19,7 @@ const UploadPage = () => {
           const newAnnotations: ImageAnnotation[] = files.map((f) => ({
             id: uuid(),
             imageData: f,
-            annotations: [],
+            shapes: [],
           }))
           dispatch(actions.setAnnotations([...annotations, ...newAnnotations]))
         }}

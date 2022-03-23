@@ -12,7 +12,7 @@ import { KonvaEventObject } from 'konva/lib/Node'
 import randomColor from 'randomcolor'
 import uuid from 'uuid/v1'
 import Konva from 'konva'
-import { Layer, Stage, Image as KonvaImage } from 'react-konva'
+import { Layer, Stage, Image as KonvaImage, Line } from 'react-konva'
 import { useDispatch, useSelector } from 'react-redux'
 import { AppState } from '../../store'
 import clsx from 'clsx'
@@ -22,49 +22,23 @@ import Toolbar from '../toolbar'
 import { GlobalHotKeys, HotKeys } from 'react-hotkeys'
 import {
   actions as AnnotationActions,
+  BaseAnnotation,
   ImageAnnotation,
 } from '../../store/annotationState'
 import Thumbnail from './Thumbnail'
 import UploadIcon from '../../assets/icons/upload-icon'
 import ImageUploader from './ImageUploader'
 import Polygon from './PolygonShape'
+import RectangleShape from './RectangleShape'
+import { intersection } from './helper'
+import Crosshair from './Crosshair'
+
 type Screen = { width: number; height: number }
 type WheelOp = 'pan-x' | 'pan-y' | 'zoom'
 type ImageList = CanvasImageSource | string
 
 const SCROLL_SMOOTHING_VACTOR = 0.3
-function intersection(
-  x0: number,
-  y0: number,
-  r0: number,
-  x1: number,
-  y1: number,
-  r1: number
-) {
-  var a, dx, dy, d, h, rx, ry
-  var x2, y2
 
-  /* dx and dy are the vertical and horizontal distances between
-   * the circle centers.
-   */
-  dx = x1 - x0
-  dy = y1 - y0
-
-  /* Determine the straight-line distance between the centers. */
-  d = Math.sqrt(dy * dy + dx * dx)
-
-  /* Check for solvability. */
-  if (d > r0 + r1) {
-    /* no solution. circles do not intersect. */
-    return false
-  }
-
-  if (d < Math.abs(r0 - r1)) {
-    /* one circle is contained in the other */
-    return true
-  }
-  return false
-}
 type Props = {
   width?: number
   height?: number
@@ -95,6 +69,8 @@ const AnnotationCanvas: React.FC<Props> = ({
   )
   const stageRef = React.useRef<StageType>(null)
   const imageRef = React.useRef<Konva.Image>(null)
+  const crosshairV = React.useRef<Konva.Line>(null)
+  const crosshairH = React.useRef<Konva.Line>(null)
   const [lastCenter, setLastCenter] = React.useState<Vector2d | null>(null)
   const [lastDist, setLastDist] = React.useState<number>(0)
   const [stageScale, setStageScale] = React.useState<Vector2d>({
@@ -118,8 +94,12 @@ const AnnotationCanvas: React.FC<Props> = ({
   const handleClick = (event: KonvaEventObject<MouseEvent>) => {
     const stage = event.target.getStage()
     if (!stage) return
-    if (!started && !selectedId && currentToolbar === 'polygon') {
-      // this is the first click
+    if (
+      !started &&
+      !selectedId &&
+      ['polygon', 'rectangle'].includes(currentToolbar)
+    ) {
+      // this is the first click (starting point)
       const scale = stage.scaleX()
       const pointer = stage.getPointerPosition()
       if (!pointer) return
@@ -128,24 +108,31 @@ const AnnotationCanvas: React.FC<Props> = ({
       dispatch(toolbarActions.setBusy(true))
       setColor(randomColor())
     } else {
-      let prevPoints = points.slice(0, -2)
-      if (prevPoints.length === 0) {
-        prevPoints = points
-      }
-      // check if current point is in starting point
-      const radius = 4 / stageScale.x
-      const isAtStartPoint = intersection(
-        points[0],
-        points[1],
-        radius,
-        cursorPos[0],
-        cursorPos[1],
-        12 / stageScale.x
-      )
-      if (isAtStartPoint) {
+      // this time, the next point clicked position
+      if (currentToolbar === 'polygon') {
+        let prevPoints = points.slice(0, -2)
+        if (prevPoints.length === 0) {
+          prevPoints = points
+        }
+        // check if current point is in starting point
+        const radius = 4 / stageScale.x
+        const isAtStartPoint = intersection(
+          points[0],
+          points[1],
+          radius,
+          cursorPos[0],
+          cursorPos[1],
+          12 / stageScale.x
+        )
+        if (isAtStartPoint) {
+          finishDrawing()
+        } else {
+          started && dispatch(AnnotationActions.addPoints(cursorPos))
+        }
+      } else if (currentToolbar === 'rectangle') {
+        // this time, click event is for the end of rect points
+        // so, finish drawing
         finishDrawing()
-      } else {
-        started && dispatch(AnnotationActions.addPoints(cursorPos))
       }
     }
     // if clicked outside annotation shape, close the shape
@@ -155,24 +142,35 @@ const AnnotationCanvas: React.FC<Props> = ({
     }
   }
   const finishDrawing = React.useCallback(() => {
-    if (started) {
-      // escape last points
-      let newPoints = points.slice(0, -2)
-      dispatch(AnnotationActions.setCurrentPoints(newPoints))
-      setStarted(false)
-      // if we have points, store it as a new annotations
-      const currentAnnotation = annotations[currentImageIndex]
-      currentAnnotation.annotations.push({
+    const currentAnnotation = annotations[currentImageIndex]
+    if (started && currentAnnotation) {
+      const label = prompt(
+        'Type label name for this annotation',
+        'new annotation'
+      )
+      const newShape: BaseAnnotation = {
         id: uuid(),
-        points: newPoints,
+        points,
         type: 'polygon',
+        label: label || 'new annotation',
         color,
-      })
+      }
+      if (currentToolbar === 'polygon') {
+        // escape last points, since polygon will close it self
+        let newPoints = points.slice(0, -2)
+        dispatch(AnnotationActions.setCurrentPoints(newPoints))
+        newShape.points = newPoints
+        newShape.type = 'polygon'
+      } else if (currentToolbar === 'rectangle') {
+        newShape.type = 'rectangle'
+      }
+      currentAnnotation.shapes.push(newShape)
       const newAnnotations = [
         ...annotations.filter((a) => a.id !== currentAnnotation.id),
         currentAnnotation,
       ].sort((a, b) => a.id.localeCompare(b.id))
       dispatch(AnnotationActions.setAnnotations(newAnnotations))
+      setStarted(false)
     }
   }, [started, points, annotations[currentImageIndex]])
 
@@ -309,7 +307,7 @@ const AnnotationCanvas: React.FC<Props> = ({
     setPanning(false)
   }
 
-  const resetZoom = () => {
+  const resizeStage = () => {
     if (!img) return
     if (!stageRef.current) return
     const imageWidth = img.width as number
@@ -339,7 +337,7 @@ const AnnotationCanvas: React.FC<Props> = ({
       const newAnnotations: ImageAnnotation[] = imagesProp.map((img) => ({
         id: uuid(),
         imageData: img,
-        annotations: [],
+        shapes: [],
       }))
       preloadImage(imagesProp[0]).then((newImg) => {
         setImg(newImg)
@@ -361,8 +359,31 @@ const AnnotationCanvas: React.FC<Props> = ({
   }, [stageScale])
 
   // recalculate image size to fit the screen on resize
-  React.useEffect(resetZoom, [screen, img, currentImageIndex])
+  React.useEffect(resizeStage, [screen, img, currentImageIndex])
 
+  const saveAnnotation = (annotationId: string | null, newPoints: number[]) => {
+    const currentAnnotation = annotations[currentImageIndex]
+    const currentShape = currentAnnotation.shapes.find(
+      (x) => x.id === annotationId
+    )
+    if (currentShape) {
+      currentShape.points = newPoints
+      dispatch(
+        AnnotationActions.setAnnotations([
+          ...annotations.filter((xx) => xx.id !== currentAnnotation.id),
+          {
+            ...currentAnnotation,
+            shapes: [
+              ...currentAnnotation.shapes.filter(
+                (aaa) => aaa.id !== annotationId
+              ),
+              currentShape,
+            ],
+          },
+        ])
+      )
+    }
+  }
   const hotkeyHandlers = {
     PAN_Y: () => setWheelOp('pan-y'),
     PAN_X: () => setWheelOp('pan-x'),
@@ -377,7 +398,7 @@ const AnnotationCanvas: React.FC<Props> = ({
         <GlobalHotKeys keyMap={annotationHotKeyMap} handlers={hotkeyHandlers}>
           <Stage
             className={clsx({
-              'cursor-default': currentToolbar === 'pointer',
+              'cursor-default': currentToolbar === 'pointer' || selectedId,
               'cursor-crosshair':
                 currentToolbar === 'rectangle' || currentToolbar === 'polygon',
             })}
@@ -403,46 +424,61 @@ const AnnotationCanvas: React.FC<Props> = ({
             </Layer>
             <Layer>
               {annotations.length > currentImageIndex &&
-                annotations[currentImageIndex].annotations
-                  .filter((a) => a.type === 'polygon')
-                  .map((a, i) => (
-                    <Polygon
-                      onSelect={() => setSelectedId(a.id)}
-                      selected={a.id === selectedId}
-                      onResize={(newPoints) => {
-                        const currentAnnotation = annotations[currentImageIndex]
-                        const newPolygon = currentAnnotation.annotations.find(
-                          (x) => x.id === a.id
-                        )
-                        if (newPolygon) {
-                          newPolygon.points = newPoints
+                annotations[currentImageIndex].shapes.map((a, i) => {
+                  if (a.type === 'polygon') {
+                    return (
+                      <Polygon
+                        onSelect={() => setSelectedId(a.id)}
+                        selected={a.id === selectedId}
+                        onResize={(newPoints) => {
+                          saveAnnotation(a.id, newPoints)
+                        }}
+                        key={i}
+                        points={a.points}
+                        strokeColor={a.color}
+                        fillColor={`${a.color}55`}
+                        dotSize={4 / stageScale.x}
+                        strokeWidth={1 / stageScale.x}
+                        label={a.label}
+                        onLabelEdit={(newLabel) => {
                           dispatch(
-                            AnnotationActions.setAnnotations([
-                              ...annotations.filter(
-                                (xx) => xx.id !== currentAnnotation.id
-                              ),
-                              {
-                                ...currentAnnotation,
-                                annotations: [
-                                  ...currentAnnotation.annotations.filter(
-                                    (aaa) => aaa.id !== a.id
-                                  ),
-                                  newPolygon,
-                                ],
-                              },
-                            ])
+                            AnnotationActions.changeShapeLabel(
+                              a.id,
+                              newLabel || ''
+                            )
                           )
-                        }
-                      }}
-                      key={i}
-                      points={a.points}
-                      strokeColor={a.color}
-                      fillColor={`${a.color}55`}
-                      dotSize={4 / stageScale.x}
-                      strokeWidth={2 / stageScale.x}
-                    />
-                  ))}
-              {started && (
+                        }}
+                      />
+                    )
+                  } else if (a.type === 'rectangle') {
+                    return (
+                      <RectangleShape
+                        id={a.id}
+                        points={a.points}
+                        dotSize={4 / stageScale.x}
+                        selected={a.id === selectedId}
+                        onSelect={() => setSelectedId(a.id)}
+                        key={`rect-${i}`}
+                        strokeColor={a.color}
+                        fillColor={`${a.color}55`}
+                        strokeWidth={1 / stageScale.x}
+                        onResize={(id, points) => {
+                          saveAnnotation(id, points)
+                        }}
+                        label={a.label}
+                        onLabelEdit={(newLabel) => {
+                          dispatch(
+                            AnnotationActions.changeShapeLabel(
+                              a.id,
+                              newLabel || ''
+                            )
+                          )
+                        }}
+                      />
+                    )
+                  }
+                })}
+              {started && currentToolbar === 'polygon' && (
                 <Polygon
                   strokeWidth={2 / stageScale.x}
                   points={points}
@@ -452,7 +488,31 @@ const AnnotationCanvas: React.FC<Props> = ({
                   showResizer
                 />
               )}
+              {started && currentToolbar === 'rectangle' && (
+                <RectangleShape
+                  id={null}
+                  dotSize={4 / stageScale.x}
+                  points={points}
+                  strokeColor={'#83CC18'}
+                  fillColor={'#83CC1844'}
+                  strokeWidth={1 / stageScale.x}
+                />
+              )}
             </Layer>
+            {!selectedId &&
+              currentToolbar === 'rectangle' &&
+              img &&
+              cursorPos &&
+              cursorPos.length > 1 &&
+              stageRef.current && (
+                <Crosshair
+                  stage={stageRef.current}
+                  dashSize={[4 / stageScale.x, 4 / stageScale.y]}
+                  points={cursorPos}
+                  strokeColor={'#82CB19'}
+                  strokeWidth={1 / stageScale.x}
+                />
+              )}
           </Stage>
           <Thumbnail />
           <Toolbar />
@@ -466,7 +526,7 @@ const AnnotationCanvas: React.FC<Props> = ({
               const newAnnotations: ImageAnnotation[] = files.map((f) => ({
                 id: uuid(),
                 imageData: f,
-                annotations: [],
+                shapes: [],
               }))
               dispatch(
                 AnnotationActions.setAnnotations([

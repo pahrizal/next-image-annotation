@@ -10,7 +10,8 @@ const AnnotationCanvas = dynamic(
   }
 )
 
-const imageURL = 'https://picsum.photos/1920/1080'
+const imageURL =
+  'https://design-milk.com/images/2014/12/BASE-Object-Desk-Accessories-7.jpg'
 
 const Home: NextPage = () => {
   const dispatch = useDispatch()

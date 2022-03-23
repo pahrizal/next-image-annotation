@@ -28,7 +28,7 @@ export default function ResizeCircle({
       x={points[0]}
       y={points[1]}
       fill="transparent"
-      stroke="white"
+      stroke="#83CC18"
       strokeWidth={strokeWidth}
       radius={size}
       onMouseEnter={(e) => {

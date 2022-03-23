@@ -16,7 +16,6 @@ export const configureStore = (initialState: AppState) => {
   const rootReducer = combineReducers({
     ...reducers,
   })
-  const ENABLE_REDUX = process.env.REACT_APP_ENABLE_REDUX === 'TRUE'
   const store = createStore(
     rootReducer,
     initialState,

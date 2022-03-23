@@ -3,17 +3,18 @@ import uuid from 'uuid'
 import { preloadImage } from '../utils/helper'
 import { ThunkAction } from './index'
 import { ToolbarActions, toolbarActions } from './toolbarState'
-interface BaseAnnotation {
+export interface BaseAnnotation {
   id: string
   color: string
   type: 'rectangle' | 'polygon' | 'line'
   points: number[]
+  label?: string
 }
 
 export interface ImageAnnotation {
   id: string
   imageData: string
-  annotations: BaseAnnotation[]
+  shapes: BaseAnnotation[]
 }
 
 export interface State {
@@ -21,18 +22,21 @@ export interface State {
   annotations: ImageAnnotation[]
   currentIndex: number
   currentPoints: number[]
+  currentId: string | null
 }
 export const initialState: State = {
   busy: false,
   annotations: [],
   currentIndex: 0,
   currentPoints: [],
+  currentId: null,
 }
 
 interface ActionTypes {
   readonly SET_BUSY: 'SET_BUSY'
   readonly SET_ANNOTATIONS: 'SET_ANNOTATIONS'
   readonly SET_CURRENT_INDEX: 'SET_CURRENT_INDEX'
+  readonly SET_CURRENT_ID: 'SET_CURRENT_ID'
   readonly SET_CURRENT_POINTS: 'SET_CURRENT_POINTS'
 }
 
@@ -41,6 +45,7 @@ const actionsTypes: ActionTypes = {
   SET_CURRENT_INDEX: 'SET_CURRENT_INDEX',
   SET_ANNOTATIONS: 'SET_ANNOTATIONS',
   SET_CURRENT_POINTS: 'SET_CURRENT_POINTS',
+  SET_CURRENT_ID: 'SET_CURRENT_ID',
 }
 
 interface SetBusy {
@@ -50,6 +55,10 @@ interface SetBusy {
 interface SetCurrentIndex {
   type: 'SET_CURRENT_INDEX'
   payload: typeof initialState.currentIndex
+}
+interface SetCurrentId {
+  type: 'SET_CURRENT_ID'
+  payload: typeof initialState.currentId
 }
 interface SetAnnotations {
   type: 'SET_ANNOTATIONS'
@@ -65,6 +74,7 @@ export type Actions =
   | SetBusy
   | SetAnnotations
   | SetCurrentIndex
+  | SetCurrentId
   | SetCurrentPoints
 
 export const actions = {
@@ -109,7 +119,13 @@ export const actions = {
           type: actionsTypes.SET_CURRENT_INDEX,
           payload: current,
         })
+      } else {
+        current = getState().annotation.currentIndex
       }
+      dispatch({
+        type: actionsTypes.SET_CURRENT_ID,
+        payload: newAnnotations[current].id,
+      })
     }
   },
   setCurrentIndex: (
@@ -129,6 +145,11 @@ export const actions = {
       const currentIndex = getState().annotation.currentIndex
       const nextIndex =
         currentIndex < images.length - 1 ? currentIndex + 1 : images.length - 1
+      const nextId = getState().annotation.annotations[nextIndex].id
+      dispatch({
+        type: actionsTypes.SET_CURRENT_ID,
+        payload: nextId,
+      })
       dispatch({
         type: actionsTypes.SET_CURRENT_INDEX,
         payload: nextIndex,
@@ -141,6 +162,11 @@ export const actions = {
       const currentIndex = getState().annotation.currentIndex
       if (images.length === 0) return
       const nextIndex = currentIndex > 0 ? currentIndex - 1 : 0
+      const nextId = getState().annotation.annotations[nextIndex].id
+      dispatch({
+        type: actionsTypes.SET_CURRENT_ID,
+        payload: nextId,
+      })
       dispatch({
         type: actionsTypes.SET_CURRENT_INDEX,
         payload: nextIndex,
@@ -177,6 +203,30 @@ export const actions = {
       })
     }
   },
+  changeShapeLabel: (
+    shapeId: string,
+    newLabel: string
+  ): ThunkAction<Actions> => {
+    return async (dispatch, getState) => {
+      const currentIndex = getState().annotation.currentIndex
+      const annotation = getState().annotation.annotations[currentIndex]
+      if (!annotation) return
+
+      const targetShapeIndex = annotation.shapes.findIndex(
+        (s) => s.id === shapeId
+      )
+
+      if (targetShapeIndex < 0) return
+      annotation.shapes[targetShapeIndex].label = newLabel
+      dispatch({
+        type: actionsTypes.SET_ANNOTATIONS,
+        payload: getState().annotation.annotations.map((a) => {
+          if (a.id === annotation.id) return annotation
+          return a
+        }),
+      })
+    }
+  },
 }
 export const reducer: Reducer<State, Actions> = (
   state: State | undefined,
@@ -201,6 +251,11 @@ export const reducer: Reducer<State, Actions> = (
       return {
         ...state,
         currentIndex: action.payload,
+      }
+    case actionsTypes.SET_CURRENT_ID:
+      return {
+        ...state,
+        currentId: action.payload,
       }
     case actionsTypes.SET_CURRENT_POINTS:
       return {

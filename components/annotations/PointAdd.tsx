@@ -17,7 +17,7 @@ const PointAdd: React.FC<Props> = ({
   return (
     <Circle
       fill="transparent"
-      stroke="white"
+      stroke="#83CC18"
       strokeWidth={strokeWidth}
       radius={size}
       dash={[size / 3, size / 3]}
