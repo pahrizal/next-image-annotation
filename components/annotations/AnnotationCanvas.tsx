@@ -481,8 +481,6 @@ const AnnotationCanvas: React.FC<Props> = ({
                   points={cursorPos}
                   strokeColor={'#82CB19'}
                   strokeWidth={1 / stageScale.x}
-                  width={stageRef.current.width()}
-                  height={stageRef.current.height()}
                 />
               )}
           </Stage>

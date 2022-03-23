@@ -6,8 +6,6 @@ type Props = {
   stage: Konva.Stage
   dashSize?: number[]
   points?: number[]
-  width?: number
-  height?: number
   strokeWidth?: number
   strokeColor?: string
 }
@@ -15,8 +13,6 @@ const Crosshair: React.FC<Props> = ({
   stage,
   dashSize = [4, 4],
   points = [0, 0],
-  width = 1920,
-  height = 1080,
   strokeWidth = 4,
   strokeColor = '#82CB19',
 }) => {
