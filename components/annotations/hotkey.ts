@@ -16,6 +16,7 @@ export const toolbarHotkeymap: KeyMap = {
   TOOLBAR_UPLOAD: ['0'],
   TOOLBAR_POINTER: ['1'],
   TOOLBAR_POLYGON: ['2'],
+  TOOLBAR_RECTANGLE: ['3'],
   TOOLBAR_TOOGLE_THUMBNAIL: ['4'],
   NEXT_IMAGE: ['d', 'right'],
   PREV_IMAGE: ['a', 'left'],
